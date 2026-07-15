@@ -89,6 +89,16 @@ function AppContent({
     premiumActive: boolean;
     themeMode: "light" | "neutral";
     notificationsEnabled: boolean;
+    completedOnboarding?: boolean;
+    wellnessGoals?: string[];
+    ageRange?: string;
+    challenges?: string[];
+    coping?: string[];
+    initialScore?: number;
+    actionPlan?: any[];
+    calmXP?: number;
+    currentStreak?: number;
+    milestonesMet?: string[];
   } | null>(null);
 
   // Fallback state if user continues offline
@@ -160,43 +170,51 @@ function AppContent({
     root.style.colorScheme = "light";
   }, [userProfile?.themeMode]);
 
-  // 1. Core Authentication Monitor (Firebase + Firestore Profile Synchronization)
+  // 1. Core Authentication Monitor (Supabase Secure Proxy Profile & Progress Synchronization)
   useEffect(() => {
     if (loadingAuth) return;
 
     if (user) {
       setIsOfflineSandbox(false);
-      const userRef = doc(db, "users", user.id);
       
-      const syncProfile = async () => {
+      const syncProfileAndData = async () => {
         try {
-          // Wrap in a snappy 800ms timeout to prevent cold database handshakes from hanging the initial screen
-          const profileSnap = await Promise.race([
-            getDoc(userRef),
-            new Promise<any>((_, reject) => 
-              setTimeout(() => reject(new Error("Firestore profile connection timed out (slow/offline link)")), 800)
-            )
-          ]);
-          if (profileSnap && profileSnap.exists()) {
-            const data = profileSnap.data();
+          // Fetch profile from our secure Supabase proxy API
+          const res = await fetch(`/api/user-profile/${user.id}`);
+          if (!res.ok) {
+            throw new Error(`Profile query failed with status ${res.status}`);
+          }
+          const data = await res.json();
+          
+          if (data) {
             setUserProfile({
-              userId: data.userId,
+              userId: data.userId || user.id,
               displayName: data.displayName || user.displayName || "Neuraliso Seeker",
-              premiumActive: data.premiumActive,
-              themeMode: data.themeMode,
-              notificationsEnabled: data.notificationsEnabled
+              premiumActive: data.premiumActive ?? false,
+              themeMode: data.themeMode || "light",
+              notificationsEnabled: data.notificationsEnabled ?? true,
+              completedOnboarding: data.completedOnboarding ?? true,
+              wellnessGoals: data.wellnessGoals,
+              ageRange: data.ageRange,
+              challenges: data.challenges,
+              coping: data.coping,
+              initialScore: data.initialScore,
+              actionPlan: data.actionPlan,
+              calmXP: data.calmXP ?? 120,
+              currentStreak: data.currentStreak ?? 5,
+              milestonesMet: data.milestonesMet ?? ["Core Breathing"]
             });
-            // Accounts that are already created should not be asked questions, skip onboarding
+            // Skip onboarding for existing records
             setIsOnboarded(true);
             localStorage.setItem("neuraliso_onboarded", "true");
           } else {
-            // Check if the Clerk account or user account was already created previously (e.g. older than 2 minutes)
+            // Check if the Clerk account or user account was already created previously (older than 2 mins)
             const isAccountAlreadyCreated = user.createdAt
               ? (Date.now() - new Date(user.createdAt).getTime() > 120000)
               : false;
 
             if (isAccountAlreadyCreated) {
-              // Existing account: setup initial profile with onboarding completed and bypass onboarding screens
+              // Existing account on Clerk, bypass onboarding
               const initialProfile = {
                 userId: user.id,
                 displayName: user.displayName || "Neuraliso Seeker",
@@ -204,21 +222,23 @@ function AppContent({
                 themeMode: "light" as const,
                 notificationsEnabled: true,
                 completedOnboarding: true,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+                calmXP: 120,
+                currentStreak: 5,
+                milestonesMet: ["Core Breathing"]
               };
-              await setDoc(userRef, initialProfile);
-              setUserProfile({
-                userId: initialProfile.userId,
-                displayName: initialProfile.displayName,
-                premiumActive: initialProfile.premiumActive,
-                themeMode: initialProfile.themeMode,
-                notificationsEnabled: initialProfile.notificationsEnabled
+              
+              // Save to Supabase
+              await fetch("/api/user-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...initialProfile, id: user.id })
               });
+
+              setUserProfile(initialProfile);
               setIsOnboarded(true);
               localStorage.setItem("neuraliso_onboarded", "true");
             } else {
-              // Brand-new account: open onboarding and ask questions
+              // Brand new user, ask questions
               const initialProfile = {
                 userId: user.id,
                 displayName: user.displayName || "Neuraliso Seeker",
@@ -226,24 +246,35 @@ function AppContent({
                 themeMode: "light" as const,
                 notificationsEnabled: true,
                 completedOnboarding: false,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+                calmXP: 120,
+                currentStreak: 5,
+                milestonesMet: ["Core Breathing"]
               };
-              await setDoc(userRef, initialProfile);
-              setUserProfile({
-                userId: initialProfile.userId,
-                displayName: initialProfile.displayName,
-                premiumActive: initialProfile.premiumActive,
-                themeMode: initialProfile.themeMode,
-                notificationsEnabled: initialProfile.notificationsEnabled
+
+              // Save to Supabase
+              await fetch("/api/user-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...initialProfile, id: user.id })
               });
+
+              setUserProfile(initialProfile);
               setIsOnboarded(false);
               localStorage.removeItem("neuraliso_onboarded");
             }
           }
+
+          // Fetch user's journal entries from Supabase Proxy
+          const entriesRes = await fetch(`/api/journal-entries/${user.id}`);
+          if (entriesRes.ok) {
+            const entriesData = await entriesRes.json();
+            if (Array.isArray(entriesData)) {
+              setEntries(entriesData);
+              localStorage.setItem("neuraliso_mood_logs", JSON.stringify(entriesData));
+            }
+          }
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          console.warn("Firestore profile handshake fallback activated:", errorMsg);
+          console.warn("Supabase profile secure handshake fallback active:", error);
           
           // Retrieve onboarding data fallback if present
           const savedOnboarding = localStorage.getItem("neuraliso_onboarding_profile");
@@ -254,29 +285,25 @@ function AppContent({
             displayName: user.displayName || parsedOnboarding?.displayName || "Neuraliso Seeker",
             premiumActive: false,
             themeMode: "light",
-            notificationsEnabled: true
+            notificationsEnabled: true,
+            calmXP: parsedOnboarding?.calmXP ?? 120,
+            currentStreak: parsedOnboarding?.currentStreak ?? 5,
+            milestonesMet: parsedOnboarding?.milestonesMet ?? ["Core Breathing"]
           });
           
-          // Respect localStorage state instead of forcing true
           const previouslyOnboarded = localStorage.getItem("neuraliso_onboarded") === "true";
           setIsOnboarded(previouslyOnboarded);
-          
-          const isTimeoutOrOffline = errorMsg.toLowerCase().includes("timeout") || 
-                             errorMsg.toLowerCase().includes("offline") || 
-                             errorMsg.toLowerCase().includes("network") ||
-                             errorMsg.toLowerCase().includes("unavailable");
-          
-          if (!isTimeoutOrOffline) {
+
+          const savedLogs = localStorage.getItem("neuraliso_mood_logs");
+          if (savedLogs) {
             try {
-              handleFirestoreError(error, OperationType.GET, `users/${user.id}`);
-            } catch (err) {
-              console.error("Non-fatal handled profile exception:", err);
-            }
+              setEntries(JSON.parse(savedLogs));
+            } catch (e) {}
           }
         }
       };
 
-      syncProfile();
+      syncProfileAndData();
     } else {
       const savedOnboarding = localStorage.getItem("neuraliso_onboarding_profile");
       if (savedOnboarding) {
@@ -287,7 +314,10 @@ function AppContent({
             displayName: parsed.displayName || "Guest Seeker",
             premiumActive: parsed.premiumActive ?? false,
             themeMode: parsed.themeMode ?? "light",
-            notificationsEnabled: parsed.notificationsEnabled ?? true
+            notificationsEnabled: parsed.notificationsEnabled ?? true,
+            calmXP: parsed.calmXP ?? 120,
+            currentStreak: parsed.currentStreak ?? 5,
+            milestonesMet: parsed.milestonesMet ?? ["Core Breathing"]
           });
         } catch (e) {
           setUserProfile(null);
@@ -310,55 +340,6 @@ function AppContent({
     }
   }, [loadingAuth, user, isOfflineSandbox]);
 
-  // 2. Real-Time Journal Entry Listener
-  useEffect(() => {
-    if (!user) return;
-
-    const entriesRef = collection(db, "users", user.uid, "entries");
-    const q = query(entriesRef, orderBy("createdAt", "asc"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: JournalEntry[] = [];
-      snapshot.forEach((snapDoc) => {
-        const data = snapDoc.data();
-        fetched.push({
-          id: snapDoc.id,
-          date: data.date,
-          mood: data.mood,
-          stress: data.stress,
-          energy: data.energy,
-          note: data.note,
-          actionPlan: data.actionPlan || []
-        });
-      });
-      setEntries(fetched);
-    }, (error) => {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      const isOffline = errorMsg.toLowerCase().includes("offline") || 
-                        errorMsg.toLowerCase().includes("network") || 
-                        errorMsg.toLowerCase().includes("failed-precondition") ||
-                        errorMsg.toLowerCase().includes("unavailable");
-      
-      if (isOffline) {
-        console.warn("Entries subscription offline mode fallback active:", errorMsg);
-        const saved = localStorage.getItem("neuraliso_mood_logs");
-        if (saved) {
-          try {
-            setEntries(JSON.parse(saved));
-          } catch (e) {}
-        }
-      } else {
-        try {
-          handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/entries`);
-        } catch (err) {
-          console.error("Non-fatal entries listing exception:", err);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
   // Sync to database or local storage fallback
   const handleSaveEntry = async (newEntry: JournalEntry) => {
     // Play comforting sound and log Google Analytics custom event
@@ -379,88 +360,57 @@ function AppContent({
       return;
     }
 
-    const entryRef = doc(db, "users", user.uid, "entries", newEntry.id);
     try {
-      await setDoc(entryRef, {
-        id: newEntry.id,
-        date: newEntry.date,
-        mood: newEntry.mood,
-        stress: newEntry.stress,
-        energy: newEntry.energy,
-        note: newEntry.note,
-        actionPlan: newEntry.actionPlan,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+      await fetch("/api/journal-entries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          entry: newEntry
+        })
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      const isOffline = errorMsg.toLowerCase().includes("offline") || 
-                        errorMsg.toLowerCase().includes("network") || 
-                        errorMsg.toLowerCase().includes("failed-precondition") ||
-                        errorMsg.toLowerCase().includes("unavailable");
-      
-      if (isOffline) {
-        console.warn("Saving entry failed due to offline state, logging locally:", errorMsg);
-        setEntries((prev) => {
-          const updated = [...prev, newEntry];
-          localStorage.setItem("neuraliso_mood_logs", JSON.stringify(updated));
-          return updated;
-        });
-      } else {
-        try {
-          handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/entries/${newEntry.id}`);
-        } catch (err) {
-          console.error("Non-fatal handled entry save exception:", err);
-        }
-      }
+      console.warn("Saving journal entry to Supabase failed or went offline:", error);
     }
   };
 
-  // Sync Profile Settings with Firestore
+  // Sync Profile Settings with Supabase Secure Proxy
   const handleUpdateProfile = async (fields: Partial<typeof userProfile>) => {
+    const nextProfile = userProfile ? { ...userProfile, ...fields } : {
+      userId: user?.id || "OFFLINE-SANDBOX-USER",
+      displayName: user?.displayName || "Neuraliso Seeker",
+      premiumActive: false,
+      themeMode: "light" as const,
+      notificationsEnabled: true,
+      ...fields
+    };
+
+    setUserProfile(nextProfile);
+
     if (!user) {
-      const savedOnboarding = localStorage.getItem("neuraliso_onboarding_profile");
-      let profileData = savedOnboarding ? JSON.parse(savedOnboarding) : {};
-      profileData = { ...profileData, ...fields };
-      localStorage.setItem("neuraliso_onboarding_profile", JSON.stringify(profileData));
-      setUserProfile((prev: any) => {
-        const next = prev ? { ...prev, ...fields } : {
-          userId: "OFFLINE-SANDBOX-USER",
-          displayName: "Guest Seeker",
-          premiumActive: false,
-          themeMode: "light",
-          notificationsEnabled: true,
-          ...fields
-        };
-        return next;
-      });
+      localStorage.setItem("neuraliso_onboarding_profile", JSON.stringify(nextProfile));
       return;
     }
-    const userRef = doc(db, "users", user.uid);
+
     try {
-      const updatedFields = {
-        ...fields,
-        updatedAt: serverTimestamp()
-      };
-      await updateDoc(userRef, updatedFields);
-      setUserProfile((prev: any) => ({ ...prev, ...fields }));
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      const isOffline = errorMsg.toLowerCase().includes("offline") || 
-                        errorMsg.toLowerCase().includes("network") || 
-                        errorMsg.toLowerCase().includes("failed-precondition") ||
-                        errorMsg.toLowerCase().includes("unavailable");
-      
-      if (isOffline) {
-        console.warn("Updating profile settings offline mode fallback active:", errorMsg);
-        setUserProfile((prev: any) => ({ ...prev, ...fields }));
-      } else {
-        try {
-          handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
-        } catch (err) {
-          console.error("Non-fatal profile update exception:", err);
-        }
+      const res = await fetch("/api/user-profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...nextProfile,
+          id: user.id,
+          userId: user.id
+        })
+      });
+      if (!res.ok) {
+        throw new Error(`Profile update failed with status ${res.status}`);
       }
+    } catch (error) {
+      console.warn("Supabase profile update offline/network error, saved locally:", error);
     }
   };
 
@@ -471,7 +421,7 @@ function AppContent({
 
     // Save profile settings
     const profileData = {
-      userId: user?.uid || "OFFLINE-SANDBOX-USER",
+      userId: user?.id || "OFFLINE-SANDBOX-USER",
       displayName: data.displayName,
       premiumActive: false,
       themeMode: "light" as const,
@@ -482,7 +432,10 @@ function AppContent({
       coping: data.coping,
       initialScore: data.initialScore,
       actionPlan: data.actionPlan,
-      completedOnboarding: true
+      completedOnboarding: true,
+      calmXP: userProfile?.calmXP ?? 120,
+      currentStreak: userProfile?.currentStreak ?? 5,
+      milestonesMet: userProfile?.milestonesMet ?? ["Core Breathing"]
     };
 
     setOnboardingProfile(profileData);
@@ -490,13 +443,18 @@ function AppContent({
     localStorage.setItem("neuraliso_onboarded", "true");
 
     if (user) {
-      const userRef = doc(db, "users", user.uid);
-      // Run the firestore setDoc in background without blocking the UI transition
-      setDoc(userRef, {
-        ...profileData,
-        updatedAt: serverTimestamp()
-      }, { merge: true }).catch((err) => {
-        console.error("Error writing onboarding data to firestore background task:", err);
+      fetch("/api/user-profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...profileData,
+          id: user.id,
+          userId: user.id
+        })
+      }).catch((err) => {
+        console.error("Error writing onboarding data to Supabase background task:", err);
       });
       
       setUserProfile({
@@ -504,7 +462,17 @@ function AppContent({
         displayName: profileData.displayName,
         premiumActive: profileData.premiumActive,
         themeMode: profileData.themeMode,
-        notificationsEnabled: profileData.notificationsEnabled
+        notificationsEnabled: profileData.notificationsEnabled,
+        completedOnboarding: true,
+        wellnessGoals: profileData.wellnessGoals,
+        ageRange: profileData.ageRange,
+        challenges: profileData.challenges,
+        coping: profileData.coping,
+        initialScore: profileData.initialScore,
+        actionPlan: profileData.actionPlan,
+        calmXP: profileData.calmXP,
+        currentStreak: profileData.currentStreak,
+        milestonesMet: profileData.milestonesMet
       });
     } else {
       setIsOfflineSandbox(true);
@@ -514,7 +482,17 @@ function AppContent({
         displayName: data.displayName,
         premiumActive: false,
         themeMode: "light",
-        notificationsEnabled: data.notifications
+        notificationsEnabled: data.notifications,
+        completedOnboarding: true,
+        wellnessGoals: data.wellnessGoals,
+        ageRange: data.ageRange,
+        challenges: data.challenges,
+        coping: data.coping,
+        initialScore: data.initialScore,
+        actionPlan: data.actionPlan,
+        calmXP: 120,
+        currentStreak: 5,
+        milestonesMet: ["Core Breathing"]
       });
     }
 
@@ -690,7 +668,10 @@ function AppContent({
             )}
 
             {activeView === "relief" && (
-              <ReliefStationView />
+              <ReliefStationView 
+                userProfile={userProfile}
+                onUpdateProfile={handleUpdateProfile}
+              />
             )}
 
             {activeView === "reviews" && (

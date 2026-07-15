@@ -929,6 +929,300 @@ app.post("/api/reviews/notify", async (req, res) => {
   }
 });
 
+// Proxy route for fetching a user profile from Supabase securely
+app.get("/api/user-profile/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const baseUrl = getSupabaseUrl();
+    // Try to fetch from user_profiles
+    const targetUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    const apiKey = getSupabaseKey();
+    if (!apiKey) {
+      throw new Error("Supabase key not configured or decrypted");
+    }
+    const response = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Supabase user_profiles query failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const record = data[0];
+      // If the table uses profile_data column, parse it
+      if (record.profile_data) {
+        try {
+          const parsed = JSON.parse(record.profile_data);
+          return res.json({ ...parsed, id: record.id });
+        } catch (e) {
+          // Fallback to manual parsing
+        }
+      }
+      // Otherwise, construct camelCase fields from columns or return as-is
+      return res.json({
+        id: record.id,
+        userId: record.id,
+        displayName: record.display_name || record.displayName || record.displayname,
+        premiumActive: record.premium_active ?? record.premiumActive ?? record.premiumactive ?? false,
+        themeMode: record.theme_mode || record.themeMode || record.thememode || "light",
+        notificationsEnabled: record.notifications_enabled ?? record.notificationsEnabled ?? record.notificationsenabled ?? true,
+        completedOnboarding: record.completed_onboarding ?? record.completedOnboarding ?? record.completedonboarding ?? false,
+        wellnessGoals: record.wellness_goals || record.wellnessGoals || record.wellnessgoals,
+        ageRange: record.age_range || record.ageRange || record.agerange,
+        challenges: record.challenges,
+        coping: record.coping,
+        initialScore: record.initial_score ?? record.initialScore ?? record.initialscore,
+        actionPlan: record.action_plan || record.actionPlan || record.actionplan,
+        calmXP: record.calm_xp ?? record.calmXP ?? record.calmxp ?? 120,
+        currentStreak: record.current_streak ?? record.currentStreak ?? record.currentstreak ?? 5,
+        milestonesMet: record.milestones_met || record.milestonesMet || record.milestonesmet
+      });
+    }
+    return res.json(null);
+  } catch (error: any) {
+    console.error("[Proxy user-profile GET] Error:", error.message || error);
+    return res.status(500).json({ error: error.message || "Failed to retrieve user profile securely." });
+  }
+});
+
+// Proxy route for upserting a user profile to Supabase securely
+app.post("/api/user-profile", async (req, res) => {
+  try {
+    const profile = req.body;
+    const userId = profile.id || profile.userId;
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user ID in profile payload." });
+    }
+
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (!apiKey) {
+      throw new Error("Supabase key not configured or decrypted");
+    }
+
+    // Map fields for columns
+    const dbPayload = {
+      id: userId,
+      display_name: profile.displayName || profile.displayName,
+      premium_active: profile.premiumActive ?? false,
+      theme_mode: profile.themeMode || "light",
+      notifications_enabled: profile.notificationsEnabled ?? true,
+      completed_onboarding: profile.completedOnboarding ?? false,
+      wellness_goals: Array.isArray(profile.wellnessGoals) ? JSON.stringify(profile.wellnessGoals) : profile.wellnessGoals,
+      age_range: profile.ageRange,
+      challenges: Array.isArray(profile.challenges) ? JSON.stringify(profile.challenges) : profile.challenges,
+      coping: Array.isArray(profile.coping) ? JSON.stringify(profile.coping) : profile.coping,
+      initial_score: profile.initialScore,
+      action_plan: Array.isArray(profile.actionPlan) ? JSON.stringify(profile.actionPlan) : profile.actionPlan,
+      calm_xp: profile.calmXP,
+      current_streak: profile.currentStreak,
+      milestones_met: Array.isArray(profile.milestonesMet) ? JSON.stringify(profile.milestonesMet) : profile.milestonesMet,
+      profile_data: JSON.stringify(profile),
+      updated_at: new Date().toISOString()
+    };
+
+    // First check if user_profile already exists
+    const checkUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    const checkRes = await fetch(checkUrl, {
+      method: "GET",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    let upsertRes;
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      if (Array.isArray(checkData) && checkData.length > 0) {
+        // Exists, perform PATCH
+        const updateUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+        upsertRes = await fetch(updateUrl, {
+          method: "PATCH",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify(dbPayload)
+        });
+      } else {
+        // Doesn't exist, perform POST
+        const insertUrl = `${baseUrl}/rest/v1/user_profiles`;
+        upsertRes = await fetch(insertUrl, {
+          method: "POST",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify({
+            ...dbPayload,
+            created_at: new Date().toISOString()
+          })
+        });
+      }
+    } else {
+      throw new Error(`Failed to check existing profile: status ${checkRes.status}`);
+    }
+
+    if (!upsertRes.ok) {
+      const detail = await upsertRes.text();
+      throw new Error(`Supabase user_profile write failed with status ${upsertRes.status}: ${detail}`);
+    }
+
+    const data = await upsertRes.json();
+    return res.json(data);
+  } catch (error: any) {
+    console.error("[Proxy user-profile POST] Error:", error.message || error);
+    return res.status(500).json({ error: error.message || "Failed to update user profile securely." });
+  }
+});
+
+// Proxy route for fetching journal entries from Supabase securely
+app.get("/api/journal-entries/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const baseUrl = getSupabaseUrl();
+    const targetUrl = `${baseUrl}/rest/v1/journal_entries?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.asc`;
+    const apiKey = getSupabaseKey();
+    if (!apiKey) {
+      throw new Error("Supabase key not configured or decrypted");
+    }
+    const response = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Supabase journal_entries query failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    const parsedEntries = Array.isArray(data) ? data.map((record: any) => {
+      if (record.entry_data) {
+        try {
+          return JSON.parse(record.entry_data);
+        } catch (e) {
+          // Fallback
+        }
+      }
+      return {
+        id: record.id,
+        date: record.date,
+        mood: record.mood,
+        stress: record.stress,
+        energy: record.energy,
+        note: record.note,
+        actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : []
+      };
+    }) : [];
+
+    return res.json(parsedEntries);
+  } catch (error: any) {
+    console.error("[Proxy journal-entries GET] Error:", error.message || error);
+    return res.status(500).json({ error: error.message || "Failed to retrieve journal entries securely." });
+  }
+});
+
+// Proxy route for saving/upserting a journal entry to Supabase securely
+app.post("/api/journal-entries", async (req, res) => {
+  try {
+    const { userId, entry } = req.body;
+    if (!userId || !entry) {
+      return res.status(400).json({ error: "Missing userId or entry data." });
+    }
+
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (!apiKey) {
+      throw new Error("Supabase key not configured or decrypted");
+    }
+
+    const dbPayload = {
+      id: entry.id,
+      user_id: userId,
+      date: entry.date,
+      mood: entry.mood,
+      stress: entry.stress,
+      energy: entry.energy,
+      note: entry.note,
+      action_plan: Array.isArray(entry.actionPlan) ? JSON.stringify(entry.actionPlan) : entry.actionPlan,
+      entry_data: JSON.stringify(entry),
+      updated_at: new Date().toISOString()
+    };
+
+    // First check if entry already exists
+    const checkUrl = `${baseUrl}/rest/v1/journal_entries?id=eq.${encodeURIComponent(entry.id)}`;
+    const checkRes = await fetch(checkUrl, {
+      method: "GET",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    let upsertRes;
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      if (Array.isArray(checkData) && checkData.length > 0) {
+        // Exists, perform PATCH
+        const updateUrl = `${baseUrl}/rest/v1/journal_entries?id=eq.${encodeURIComponent(entry.id)}`;
+        upsertRes = await fetch(updateUrl, {
+          method: "PATCH",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify(dbPayload)
+        });
+      } else {
+        // Doesn't exist, perform POST
+        const insertUrl = `${baseUrl}/rest/v1/journal_entries`;
+        upsertRes = await fetch(insertUrl, {
+          method: "POST",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify({
+            ...dbPayload,
+            created_at: new Date().toISOString()
+          })
+        });
+      }
+    } else {
+      throw new Error(`Failed to check existing journal entry: status ${checkRes.status}`);
+    }
+
+    if (!upsertRes.ok) {
+      const detail = await upsertRes.text();
+      throw new Error(`Supabase journal_entries write failed with status ${upsertRes.status}: ${detail}`);
+    }
+
+    const data = await upsertRes.json();
+    return res.json(data);
+  } catch (error: any) {
+    console.error("[Proxy journal-entries POST] Error:", error.message || error);
+    return res.status(500).json({ error: error.message || "Failed to update journal entry securely." });
+  }
+});
+
 // Proxy route for fetching reviews from Supabase securely
 app.get("/api/reviews", async (req, res) => {
   try {

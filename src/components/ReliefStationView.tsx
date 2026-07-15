@@ -44,7 +44,12 @@ interface ReelSomaticTheme {
   scientificBase: string;
 }
 
-export const ReliefStationView: React.FC = () => {
+interface ReliefStationViewProps {
+  userProfile?: any;
+  onUpdateProfile?: (fields: any) => void;
+}
+
+export const ReliefStationView: React.FC<ReliefStationViewProps> = ({ userProfile, onUpdateProfile }) => {
   // Navigation & States
   const [showSanctuaryIntro, setShowSanctuaryIntro] = useState<boolean>(true);
   const [activeIndex, setActiveIndex] = useState<number>(0);
@@ -54,9 +59,22 @@ export const ReliefStationView: React.FC = () => {
   const [userMood, setUserMood] = useState<string>("stressed"); // stressed, anxious, sad, fatigued, restless
   
   // Engagement and Game mechanics
-  const [calmXP, setCalmXP] = useState<number>(120);
-  const [currentStreak, setCurrentStreak] = useState<number>(5);
-  const [milestonesMet, setMilestonesMet] = useState<string[]>(["Core Breathing"]);
+  const [calmXP, setCalmXP] = useState<number>(() => userProfile?.calmXP ?? 120);
+  const [currentStreak, setCurrentStreak] = useState<number>(() => userProfile?.currentStreak ?? 5);
+  const [milestonesMet, setMilestonesMet] = useState<string[]>(() => userProfile?.milestonesMet ?? ["Core Breathing"]);
+
+  useEffect(() => {
+    if (onUpdateProfile && userProfile) {
+      if (
+        calmXP !== userProfile.calmXP ||
+        currentStreak !== userProfile.currentStreak ||
+        JSON.stringify(milestonesMet) !== JSON.stringify(userProfile.milestonesMet)
+      ) {
+        onUpdateProfile({ calmXP, currentStreak, milestonesMet });
+      }
+    }
+  }, [calmXP, currentStreak, milestonesMet, onUpdateProfile, userProfile]);
+
   const [showXPToast, setShowXPToast] = useState<boolean>(false);
   const [xpToastMsg, setXpToastMsg] = useState<string>("");
   const [activeSeekers, setActiveSeekers] = useState<number>(2451);

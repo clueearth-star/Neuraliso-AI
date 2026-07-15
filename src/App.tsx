@@ -53,6 +53,7 @@ interface AppContentProps {
     uid: string;
     displayName: string;
     email: string;
+    createdAt?: Date;
   } | null;
   loadingAuth: boolean;
   loginWithGoogle: () => Promise<any>;
@@ -189,27 +190,56 @@ function AppContent({
             setIsOnboarded(true);
             localStorage.setItem("neuraliso_onboarded", "true");
           } else {
-            // First time registration setup
-            const initialProfile = {
-              userId: user.id,
-              displayName: user.displayName || "Neuraliso Seeker",
-              premiumActive: false,
-              themeMode: "light" as const,
-              notificationsEnabled: true,
-              completedOnboarding: false,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            };
-            await setDoc(userRef, initialProfile);
-            setUserProfile({
-              userId: initialProfile.userId,
-              displayName: initialProfile.displayName,
-              premiumActive: initialProfile.premiumActive,
-              themeMode: initialProfile.themeMode,
-              notificationsEnabled: initialProfile.notificationsEnabled
-            });
-            setIsOnboarded(false);
-            localStorage.removeItem("neuraliso_onboarded");
+            // Check if the Clerk account or user account was already created previously (e.g. older than 2 minutes)
+            const isAccountAlreadyCreated = user.createdAt
+              ? (Date.now() - new Date(user.createdAt).getTime() > 120000)
+              : false;
+
+            if (isAccountAlreadyCreated) {
+              // Existing account: setup initial profile with onboarding completed and bypass onboarding screens
+              const initialProfile = {
+                userId: user.id,
+                displayName: user.displayName || "Neuraliso Seeker",
+                premiumActive: false,
+                themeMode: "light" as const,
+                notificationsEnabled: true,
+                completedOnboarding: true,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              };
+              await setDoc(userRef, initialProfile);
+              setUserProfile({
+                userId: initialProfile.userId,
+                displayName: initialProfile.displayName,
+                premiumActive: initialProfile.premiumActive,
+                themeMode: initialProfile.themeMode,
+                notificationsEnabled: initialProfile.notificationsEnabled
+              });
+              setIsOnboarded(true);
+              localStorage.setItem("neuraliso_onboarded", "true");
+            } else {
+              // Brand-new account: open onboarding and ask questions
+              const initialProfile = {
+                userId: user.id,
+                displayName: user.displayName || "Neuraliso Seeker",
+                premiumActive: false,
+                themeMode: "light" as const,
+                notificationsEnabled: true,
+                completedOnboarding: false,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              };
+              await setDoc(userRef, initialProfile);
+              setUserProfile({
+                userId: initialProfile.userId,
+                displayName: initialProfile.displayName,
+                premiumActive: initialProfile.premiumActive,
+                themeMode: initialProfile.themeMode,
+                notificationsEnabled: initialProfile.notificationsEnabled
+              });
+              setIsOnboarded(false);
+              localStorage.removeItem("neuraliso_onboarded");
+            }
           }
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
@@ -461,21 +491,21 @@ function AppContent({
 
     if (user) {
       const userRef = doc(db, "users", user.uid);
-      try {
-        await setDoc(userRef, {
-          ...profileData,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-        setUserProfile({
-          userId: profileData.userId,
-          displayName: profileData.displayName,
-          premiumActive: profileData.premiumActive,
-          themeMode: profileData.themeMode,
-          notificationsEnabled: profileData.notificationsEnabled
-        });
-      } catch (err) {
-        console.error("Error writing onboarding data to firestore", err);
-      }
+      // Run the firestore setDoc in background without blocking the UI transition
+      setDoc(userRef, {
+        ...profileData,
+        updatedAt: serverTimestamp()
+      }, { merge: true }).catch((err) => {
+        console.error("Error writing onboarding data to firestore background task:", err);
+      });
+      
+      setUserProfile({
+        userId: profileData.userId,
+        displayName: profileData.displayName,
+        premiumActive: profileData.premiumActive,
+        themeMode: profileData.themeMode,
+        notificationsEnabled: profileData.notificationsEnabled
+      });
     } else {
       setIsOfflineSandbox(true);
       // Simulate fallback credentials for sandboxed user
@@ -788,7 +818,8 @@ function AppWithClerk() {
     id: cUser.id,
     uid: cUser.id,
     displayName: cUser.fullName || cUser.username || "Neuraliso Seeker",
-    email: cUser.primaryEmailAddress?.emailAddress || ""
+    email: cUser.primaryEmailAddress?.emailAddress || "",
+    createdAt: cUser.createdAt
   } : null;
 
   const handleLoginWithGoogle = async () => {
@@ -832,6 +863,7 @@ function AppWithFirebase() {
     uid: string;
     displayName: string;
     email: string;
+    createdAt?: Date;
   } | null>(null);
   const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
 

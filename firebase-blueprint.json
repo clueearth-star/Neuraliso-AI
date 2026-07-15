@@ -1,0 +1,142 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile settings and premium membership information.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique Google Auth User ID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's displayed name."
+        },
+        "premiumActive": {
+          "type": "boolean",
+          "description": "True if user upgraded to premium."
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["light", "neutral"],
+          "description": "Selected visual background color theme."
+        },
+        "notificationsEnabled": {
+          "type": "boolean",
+          "description": "True if breathing push alerts enabled."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the user was registered."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When settings were last adjusted."
+        }
+      },
+      "required": ["userId", "displayName", "premiumActive", "themeMode", "notificationsEnabled"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "An individual daily wellness log containing stress metrics, feeling, and an action plan.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique document ID for this entry."
+        },
+        "date": {
+          "type": "string",
+          "description": "Display format date (e.g. 'Jun 9')."
+        },
+        "mood": {
+          "type": "string",
+          "enum": ["sad", "anxious", "overwhelmed", "lonely", "neutral", "happy"],
+          "description": "Primary emotional state selected by the user."
+        },
+        "stress": {
+          "type": "integer",
+          "description": "Stress rating out of 10."
+        },
+        "energy": {
+          "type": "integer",
+          "description": "Energy rating out of 10."
+        },
+        "note": {
+          "type": "string",
+          "description": "Personal textual reflections."
+        },
+        "actionPlan": {
+          "type": "array",
+          "description": "Suggested action items list for selected mood."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": ["id", "date", "mood", "stress", "energy", "note", "actionPlan"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A public review shared by a user about their experience with Serene AI.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique review document ID."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who posted the review."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The public display name of the reviewer."
+        },
+        "rating": {
+          "type": "integer",
+          "description": "User rating from 1 to 5 stars."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Detailed review feedback comment text."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": ["id", "userId", "userName", "rating", "comment"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user core options and customization profiles."
+    },
+    "/users/{userId}/entries/{entryId}": {
+      "schema": "JournalEntry",
+      "description": "Saves historical stress levels and dynamic actionable plans."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Collection of public app reviews shared with all users."
+    }
+  }
+}

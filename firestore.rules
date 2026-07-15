@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net Default-Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Custom helper functions
+    function isValidId(id) { 
+      return id is string && id.size() <= 128; 
+    }
+
+    // Match patterns for users
+    match /users/{userId} {
+      allow read, write: if isValidId(userId);
+
+      // Entries subcollection
+      match /entries/{entryId} {
+        allow read, write: if isValidId(userId);
+      }
+    }
+
+    match /reviews/{reviewId} {
+      allow read, write: if isValidId(reviewId);
+    }
+  }
+}

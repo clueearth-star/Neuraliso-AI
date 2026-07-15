@@ -1,0 +1,6 @@
+{
+  "name": "Neuraliso AI",
+  "description": "Your AI-driven mental health first-aid kit and daily wellness companion providing emotional first aid, anxiety support, mood tracking, and AI companionship.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

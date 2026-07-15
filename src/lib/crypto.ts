@@ -58,14 +58,33 @@ export function decrypt(encryptedText: string, masterKey: string = getMasterKey(
   const tag = Buffer.from(parts[1], "hex");
   const encrypted = Buffer.from(parts[2], "hex");
   
-  const key = getEncryptionKey(masterKey);
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  
-  let decrypted = decipher.update(encrypted, "hex" as any, "utf8");
-  decrypted += decipher.final("utf8");
-  
-  return decrypted;
+  try {
+    const key = getEncryptionKey(masterKey);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    
+    let decrypted = decipher.update(encrypted, "hex" as any, "utf8");
+    decrypted += decipher.final("utf8");
+    
+    return decrypted;
+  } catch (err) {
+    // If decryption fails and we used a non-default masterKey, fall back to DEFAULT_MASTER_KEY
+    if (masterKey !== DEFAULT_MASTER_KEY) {
+      try {
+        const key = getEncryptionKey(DEFAULT_MASTER_KEY);
+        const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+        decipher.setAuthTag(tag);
+        
+        let decrypted = decipher.update(encrypted, "hex" as any, "utf8");
+        decrypted += decipher.final("utf8");
+        
+        return decrypted;
+      } catch (fallbackErr) {
+        throw err; // throw original error if fallback also fails
+      }
+    }
+    throw err;
+  }
 }
 
 /**

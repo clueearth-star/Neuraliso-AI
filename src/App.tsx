@@ -185,14 +185,9 @@ function AppContent({
               themeMode: data.themeMode,
               notificationsEnabled: data.notificationsEnabled
             });
-            // Only mark as onboarded if they have actually completed onboarding or have stored goals/completed flag
-            if (data.completedOnboarding === true || (data.wellnessGoals && data.wellnessGoals.length > 0)) {
-              setIsOnboarded(true);
-              localStorage.setItem("neuraliso_onboarded", "true");
-            } else {
-              setIsOnboarded(false);
-              localStorage.removeItem("neuraliso_onboarded");
-            }
+            // Accounts that are already created should not be asked questions, skip onboarding
+            setIsOnboarded(true);
+            localStorage.setItem("neuraliso_onboarded", "true");
           } else {
             // First time registration setup
             const initialProfile = {

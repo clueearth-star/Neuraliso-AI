@@ -40,28 +40,26 @@ function getApiKey(): string {
   if (resolvedNvidiaKey && resolvedNvidiaKey.startsWith("nvapi-")) {
     return resolvedNvidiaKey;
   }
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" && process.env.GEMINI_API_KEY !== "MOCK_KEY" && !process.env.GEMINI_API_KEY.includes(resolvedOpenRouterKey)) {
-    return process.env.GEMINI_API_KEY.trim();
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" && process.env.GEMINI_API_KEY !== "MOCK_KEY") {
+    if (!resolvedOpenRouterKey || !process.env.GEMINI_API_KEY.includes(resolvedOpenRouterKey)) {
+      return process.env.GEMINI_API_KEY.trim();
+    }
   }
   return resolvedOpenRouterKey || "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";
 }
 
 
-// Initialize GoogleGenAI client lazy-style
-let aiClient: GoogleGenAI | null = null;
+// Initialize GoogleGenAI client dynamic-style
 function getGenAI(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = getApiKey();
-    aiClient = new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
+  const apiKey = getApiKey();
+  return new GoogleGenAI({
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
       },
-    });
-  }
-  return aiClient;
+    },
+  });
 }
 
 // Circuit breaker state to track rate-limiting or quota exhaustion

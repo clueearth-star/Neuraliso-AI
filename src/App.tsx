@@ -145,6 +145,20 @@ function AppContent({
     }
   }, [entries.length]);
 
+  // Synchronize theme class directly to document element so the entire viewport matches perfectly and prevents automatic browser dark mode from leaking
+  useEffect(() => {
+    const activeTheme = userProfile?.themeMode || "light";
+    const root = document.documentElement;
+    
+    // Remove both classes first
+    root.classList.remove("theme-light", "theme-neutral");
+    // Add the active theme class
+    root.classList.add(activeTheme === "neutral" ? "theme-neutral" : "theme-light");
+    
+    // Explicitly enforce light color scheme to prevent browsers from forcing automatic dark mode overrides
+    root.style.colorScheme = "light";
+  }, [userProfile?.themeMode]);
+
   // 1. Core Authentication Monitor (Firebase + Firestore Profile Synchronization)
   useEffect(() => {
     if (loadingAuth) return;
@@ -171,9 +185,14 @@ function AppContent({
               themeMode: data.themeMode,
               notificationsEnabled: data.notificationsEnabled
             });
-            // If already has database profile, skip forced onboarding wizard
-            setIsOnboarded(true);
-            localStorage.setItem("neuraliso_onboarded", "true");
+            // Only mark as onboarded if they have actually completed onboarding or have stored goals/completed flag
+            if (data.completedOnboarding === true || (data.wellnessGoals && data.wellnessGoals.length > 0)) {
+              setIsOnboarded(true);
+              localStorage.setItem("neuraliso_onboarded", "true");
+            } else {
+              setIsOnboarded(false);
+              localStorage.removeItem("neuraliso_onboarded");
+            }
           } else {
             // First time registration setup
             const initialProfile = {
@@ -182,6 +201,7 @@ function AppContent({
               premiumActive: false,
               themeMode: "light" as const,
               notificationsEnabled: true,
+              completedOnboarding: false,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
@@ -193,6 +213,8 @@ function AppContent({
               themeMode: initialProfile.themeMode,
               notificationsEnabled: initialProfile.notificationsEnabled
             });
+            setIsOnboarded(false);
+            localStorage.removeItem("neuraliso_onboarded");
           }
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
@@ -209,8 +231,10 @@ function AppContent({
             themeMode: "light",
             notificationsEnabled: true
           });
-          setIsOnboarded(true);
-          localStorage.setItem("neuraliso_onboarded", "true");
+          
+          // Respect localStorage state instead of forcing true
+          const previouslyOnboarded = localStorage.getItem("neuraliso_onboarded") === "true";
+          setIsOnboarded(previouslyOnboarded);
           
           const isTimeoutOrOffline = errorMsg.toLowerCase().includes("timeout") || 
                              errorMsg.toLowerCase().includes("offline") || 
@@ -432,7 +456,8 @@ function AppContent({
       challenges: data.challenges,
       coping: data.coping,
       initialScore: data.initialScore,
-      actionPlan: data.actionPlan
+      actionPlan: data.actionPlan,
+      completedOnboarding: true
     };
 
     setOnboardingProfile(profileData);
@@ -445,7 +470,7 @@ function AppContent({
         await setDoc(userRef, {
           ...profileData,
           updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
         setUserProfile({
           userId: profileData.userId,
           displayName: profileData.displayName,

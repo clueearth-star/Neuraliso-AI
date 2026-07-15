@@ -26,6 +26,31 @@ try {
   console.error("[Crypto GCM] Failed to decrypt server API keys. Check MASTER_ENCRYPTION_KEY variable:", err.message || err);
 }
 
+/**
+ * Safely resolves the Supabase API key to use. Checks the environment variables
+ * before falling back to the decrypted high-security premium fallback key.
+ */
+function getSupabaseKey(): string {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY.trim() !== "") {
+    return process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
+  }
+  if (process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_ANON_KEY.trim() !== "") {
+    return process.env.SUPABASE_ANON_KEY.trim();
+  }
+  return resolvedSupabaseKey;
+}
+
+/**
+ * Safely resolves the Supabase base URL to use. Checks the environment variables
+ * before falling back to the default project URL.
+ */
+function getSupabaseUrl(): string {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_URL.trim() !== "") {
+    return process.env.SUPABASE_URL.trim();
+  }
+  return "https://tmmrquzeoykocirbempg.supabase.co";
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -907,8 +932,9 @@ app.post("/api/reviews/notify", async (req, res) => {
 // Proxy route for fetching reviews from Supabase securely
 app.get("/api/reviews", async (req, res) => {
   try {
-    const targetUrl = "https://tmmrquzeoykocirbempg.supabase.co/rest/v1/Reviews%20System?select=*&order=id.desc";
-    const apiKey = resolvedSupabaseKey;
+    const baseUrl = getSupabaseUrl();
+    const targetUrl = `${baseUrl}/rest/v1/Reviews%20System?select=*&order=id.desc`;
+    const apiKey = getSupabaseKey();
     if (!apiKey) {
       throw new Error("Supabase key not configured or decrypted");
     }
@@ -934,8 +960,9 @@ app.get("/api/reviews", async (req, res) => {
 // Proxy route for submitting reviews to Supabase securely
 app.post("/api/reviews", async (req, res) => {
   try {
-    const targetUrl = "https://tmmrquzeoykocirbempg.supabase.co/rest/v1/Reviews%20System";
-    const apiKey = resolvedSupabaseKey;
+    const baseUrl = getSupabaseUrl();
+    const targetUrl = `${baseUrl}/rest/v1/Reviews%20System`;
+    const apiKey = getSupabaseKey();
     if (!apiKey) {
       throw new Error("Supabase key not configured or decrypted");
     }

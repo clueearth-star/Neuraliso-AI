@@ -46,6 +46,7 @@ interface OnboardingWizardProps {
     notifications: boolean;
     initialScore: number;
     actionPlan: string[];
+    preferredCheckinTime: string;
   }) => void;
   onEnterEnterpriseDemo: () => void;
   currentUser?: any;
@@ -202,6 +203,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [challenges, setChallenges] = useState<string[]>([]);
   const [coping, setCoping] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
+  const [preferredCheckinTime, setPreferredCheckinTime] = useState("08:00 PM");
 
   // Core thematic 3D positions
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -322,7 +324,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       coping,
       notifications,
       initialScore: calculatedScore,
-      actionPlan
+      actionPlan,
+      preferredCheckinTime
     });
   };
 
@@ -1040,6 +1043,25 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   >
                     <div className="w-4.5 h-4.5 bg-white rounded-full transition-all transform shadow-xs" />
                   </button>
+                </div>
+
+                {/* Preferred Check-In Time Select */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">Preferred Check-In Time</span>
+                    <span className="text-[10px] text-slate-500 font-mono">When should we send your daily somatic summary?</span>
+                  </div>
+                  <select
+                    value={preferredCheckinTime}
+                    onChange={(e) => setPreferredCheckinTime(e.target.value)}
+                    className="w-full p-2.5 text-xs border border-slate-200 rounded-xl bg-white text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-primary-sage"
+                  >
+                    <option value="08:00 AM">Morning (08:00 AM)</option>
+                    <option value="12:00 PM">Noon (12:00 PM)</option>
+                    <option value="04:00 PM">Afternoon (04:00 PM)</option>
+                    <option value="08:00 PM">Evening (08:00 PM)</option>
+                    <option value="10:00 PM">Night (10:00 PM)</option>
+                  </select>
                 </div>
               </div>
 

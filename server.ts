@@ -934,8 +934,7 @@ app.get("/api/user-profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const baseUrl = getSupabaseUrl();
-    // Try to fetch from user_profiles
-    const targetUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    const targetUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
     const apiKey = getSupabaseKey();
     if (!apiKey) {
       throw new Error("Supabase key not configured or decrypted");
@@ -949,38 +948,32 @@ app.get("/api/user-profile/:userId", async (req, res) => {
       }
     });
     if (!response.ok) {
-      throw new Error(`Supabase user_profiles query failed with status ${response.status}`);
+      throw new Error(`Supabase users query failed with status ${response.status}`);
     }
     const data = await response.json();
     if (Array.isArray(data) && data.length > 0) {
       const record = data[0];
-      // If the table uses profile_data column, parse it
-      if (record.profile_data) {
-        try {
-          const parsed = JSON.parse(record.profile_data);
-          return res.json({ ...parsed, id: record.id });
-        } catch (e) {
-          // Fallback to manual parsing
-        }
-      }
-      // Otherwise, construct camelCase fields from columns or return as-is
       return res.json({
         id: record.id,
         userId: record.id,
-        displayName: record.display_name || record.displayName || record.displayname,
-        premiumActive: record.premium_active ?? record.premiumActive ?? record.premiumactive ?? false,
-        themeMode: record.theme_mode || record.themeMode || record.thememode || "light",
-        notificationsEnabled: record.notifications_enabled ?? record.notificationsEnabled ?? record.notificationsenabled ?? true,
-        completedOnboarding: record.completed_onboarding ?? record.completedOnboarding ?? record.completedonboarding ?? false,
-        wellnessGoals: record.wellness_goals || record.wellnessGoals || record.wellnessgoals,
-        ageRange: record.age_range || record.ageRange || record.agerange,
-        challenges: record.challenges,
-        coping: record.coping,
-        initialScore: record.initial_score ?? record.initialScore ?? record.initialscore,
-        actionPlan: record.action_plan || record.actionPlan || record.actionplan,
-        calmXP: record.calm_xp ?? record.calmXP ?? record.calmxp ?? 120,
-        currentStreak: record.current_streak ?? record.currentStreak ?? record.currentstreak ?? 5,
-        milestonesMet: record.milestones_met || record.milestonesMet || record.milestonesmet
+        email: record.email || "",
+        displayName: record.display_name || "Neuraliso Seeker",
+        premiumActive: record.premium_active ?? false,
+        themeMode: record.theme_mode || "light",
+        notificationsEnabled: record.notifications_enabled ?? true,
+        completedOnboarding: record.onboarding_completed ?? false,
+        primaryGoal: record.primary_goal || "",
+        stressBaseline: record.stress_baseline ?? 5,
+        preferredCheckinTime: record.preferred_checkin_time || "09:00 AM",
+        ageRange: record.age_range || "25-34",
+        wellnessGoals: record.wellness_goals ? (typeof record.wellness_goals === "string" ? JSON.parse(record.wellness_goals) : record.wellness_goals) : [],
+        challenges: record.challenges ? (typeof record.challenges === "string" ? JSON.parse(record.challenges) : record.challenges) : [],
+        coping: record.coping ? (typeof record.coping === "string" ? JSON.parse(record.coping) : record.coping) : [],
+        initialScore: record.initial_score ?? 0,
+        actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : [],
+        calmXP: record.calm_xp ?? 120,
+        currentStreak: record.current_streak ?? 5,
+        milestonesMet: record.milestones_met ? (typeof record.milestones_met === "string" ? JSON.parse(record.milestones_met) : record.milestones_met) : ["Core Breathing"]
       });
     }
     return res.json(null);
@@ -999,6 +992,24 @@ app.post("/api/user-profile", async (req, res) => {
       return res.status(400).json({ error: "Missing user ID in profile payload." });
     }
 
+    // Basic input validation to prevent oversized fields or invalid inputs
+    if (typeof userId !== "string" || userId.trim() === "") {
+      return res.status(400).json({ error: "User ID cannot be empty and must be a string." });
+    }
+    if (userId.length > 100) {
+      return res.status(400).json({ error: "User ID exceeds the maximum allowed length of 100 characters." });
+    }
+    const displayName = profile.displayName || "Neuraliso Seeker";
+    if (typeof displayName !== "string" || displayName.trim() === "") {
+      return res.status(400).json({ error: "Display name cannot be empty." });
+    }
+    if (displayName.length > 200) {
+      return res.status(400).json({ error: "Display name cannot exceed 200 characters." });
+    }
+    if (profile.email && typeof profile.email === "string" && profile.email.length > 254) {
+      return res.status(400).json({ error: "Email cannot exceed 254 characters." });
+    }
+
     const baseUrl = getSupabaseUrl();
     const apiKey = getSupabaseKey();
     if (!apiKey) {
@@ -1008,26 +1019,31 @@ app.post("/api/user-profile", async (req, res) => {
     // Map fields for columns
     const dbPayload = {
       id: userId,
-      display_name: profile.displayName || profile.displayName,
+      email: profile.email || "",
+      display_name: displayName,
       premium_active: profile.premiumActive ?? false,
       theme_mode: profile.themeMode || "light",
       notifications_enabled: profile.notificationsEnabled ?? true,
-      completed_onboarding: profile.completedOnboarding ?? false,
-      wellness_goals: Array.isArray(profile.wellnessGoals) ? JSON.stringify(profile.wellnessGoals) : profile.wellnessGoals,
-      age_range: profile.ageRange,
-      challenges: Array.isArray(profile.challenges) ? JSON.stringify(profile.challenges) : profile.challenges,
-      coping: Array.isArray(profile.coping) ? JSON.stringify(profile.coping) : profile.coping,
-      initial_score: profile.initialScore,
-      action_plan: Array.isArray(profile.actionPlan) ? JSON.stringify(profile.actionPlan) : profile.actionPlan,
-      calm_xp: profile.calmXP,
-      current_streak: profile.currentStreak,
-      milestones_met: Array.isArray(profile.milestonesMet) ? JSON.stringify(profile.milestonesMet) : profile.milestonesMet,
-      profile_data: JSON.stringify(profile),
+      onboarding_completed: profile.completedOnboarding ?? false,
+      primary_goal: profile.wellnessGoals && profile.wellnessGoals.length > 0 ? profile.wellnessGoals[0] : (profile.primaryGoal || ""),
+      stress_baseline: profile.initialScore !== undefined ? profile.initialScore : (profile.stressBaseline !== undefined ? profile.stressBaseline : 5),
+      preferred_checkin_time: profile.preferredCheckinTime || "09:00 AM",
+      age_range: profile.ageRange || "25-34",
+      
+      // Additional columns to support existing app state:
+      wellness_goals: Array.isArray(profile.wellnessGoals) ? JSON.stringify(profile.wellnessGoals) : "[]",
+      challenges: Array.isArray(profile.challenges) ? JSON.stringify(profile.challenges) : "[]",
+      coping: Array.isArray(profile.coping) ? JSON.stringify(profile.coping) : "[]",
+      initial_score: profile.initialScore ?? 0,
+      action_plan: Array.isArray(profile.actionPlan) ? JSON.stringify(profile.actionPlan) : "[]",
+      calm_xp: profile.calmXP ?? 120,
+      current_streak: profile.currentStreak ?? 5,
+      milestones_met: Array.isArray(profile.milestonesMet) ? JSON.stringify(profile.milestonesMet) : "[]",
       updated_at: new Date().toISOString()
     };
 
-    // First check if user_profile already exists
-    const checkUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+    // Check if user already exists
+    const checkUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
     const checkRes = await fetch(checkUrl, {
       method: "GET",
       headers: {
@@ -1042,7 +1058,7 @@ app.post("/api/user-profile", async (req, res) => {
       const checkData = await checkRes.json();
       if (Array.isArray(checkData) && checkData.length > 0) {
         // Exists, perform PATCH
-        const updateUrl = `${baseUrl}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}`;
+        const updateUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
         upsertRes = await fetch(updateUrl, {
           method: "PATCH",
           headers: {
@@ -1055,7 +1071,7 @@ app.post("/api/user-profile", async (req, res) => {
         });
       } else {
         // Doesn't exist, perform POST
-        const insertUrl = `${baseUrl}/rest/v1/user_profiles`;
+        const insertUrl = `${baseUrl}/rest/v1/users`;
         upsertRes = await fetch(insertUrl, {
           method: "POST",
           headers: {
@@ -1071,12 +1087,12 @@ app.post("/api/user-profile", async (req, res) => {
         });
       }
     } else {
-      throw new Error(`Failed to check existing profile: status ${checkRes.status}`);
+      throw new Error(`Failed to check existing user: status ${checkRes.status}`);
     }
 
     if (!upsertRes.ok) {
       const detail = await upsertRes.text();
-      throw new Error(`Supabase user_profile write failed with status ${upsertRes.status}: ${detail}`);
+      throw new Error(`Supabase users write failed with status ${upsertRes.status}: ${detail}`);
     }
 
     const data = await upsertRes.json();
@@ -1092,7 +1108,7 @@ app.get("/api/journal-entries/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const baseUrl = getSupabaseUrl();
-    const targetUrl = `${baseUrl}/rest/v1/journal_entries?user_id=eq.${encodeURIComponent(userId)}&order=updated_at.asc`;
+    const targetUrl = `${baseUrl}/rest/v1/entries?user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc`;
     const apiKey = getSupabaseKey();
     if (!apiKey) {
       throw new Error("Supabase key not configured or decrypted");
@@ -1106,24 +1122,17 @@ app.get("/api/journal-entries/:userId", async (req, res) => {
       }
     });
     if (!response.ok) {
-      throw new Error(`Supabase journal_entries query failed with status ${response.status}`);
+      throw new Error(`Supabase entries query failed with status ${response.status}`);
     }
     const data = await response.json();
     const parsedEntries = Array.isArray(data) ? data.map((record: any) => {
-      if (record.entry_data) {
-        try {
-          return JSON.parse(record.entry_data);
-        } catch (e) {
-          // Fallback
-        }
-      }
       return {
         id: record.id,
-        date: record.date,
+        date: record.date || record.created_at?.split("T")[0],
         mood: record.mood,
-        stress: record.stress,
-        energy: record.energy,
-        note: record.note,
+        stress: record.stress_level ?? 5,
+        energy: record.energy_level ?? 5,
+        note: record.comment || "",
         actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : []
       };
     }) : [];
@@ -1143,6 +1152,29 @@ app.post("/api/journal-entries", async (req, res) => {
       return res.status(400).json({ error: "Missing userId or entry data." });
     }
 
+    // Basic input validation
+    if (typeof userId !== "string" || userId.trim() === "") {
+      return res.status(400).json({ error: "User ID cannot be empty and must be a string." });
+    }
+    if (userId.length > 100) {
+      return res.status(400).json({ error: "User ID cannot exceed 100 characters." });
+    }
+    if (!entry.id || typeof entry.id !== "string" || entry.id.trim() === "") {
+      return res.status(400).json({ error: "Entry ID cannot be empty." });
+    }
+    if (entry.id.length > 100) {
+      return res.status(400).json({ error: "Entry ID cannot exceed 100 characters." });
+    }
+    if (!entry.mood || typeof entry.mood !== "string" || entry.mood.trim() === "") {
+      return res.status(400).json({ error: "Mood field is required." });
+    }
+    if (entry.mood.length > 50) {
+      return res.status(400).json({ error: "Mood exceeds maximum allowed length of 50 characters." });
+    }
+    if (entry.note && typeof entry.note === "string" && entry.note.length > 5000) {
+      return res.status(400).json({ error: "Comment/note exceeds maximum allowed length of 5000 characters." });
+    }
+
     const baseUrl = getSupabaseUrl();
     const apiKey = getSupabaseKey();
     if (!apiKey) {
@@ -1152,18 +1184,17 @@ app.post("/api/journal-entries", async (req, res) => {
     const dbPayload = {
       id: entry.id,
       user_id: userId,
-      date: entry.date,
       mood: entry.mood,
-      stress: entry.stress,
-      energy: entry.energy,
-      note: entry.note,
-      action_plan: Array.isArray(entry.actionPlan) ? JSON.stringify(entry.actionPlan) : entry.actionPlan,
-      entry_data: JSON.stringify(entry),
+      stress_level: entry.stress ?? 5,
+      energy_level: entry.energy ?? 5,
+      comment: entry.note || "",
+      date: entry.date || new Date().toISOString().split('T')[0],
+      action_plan: Array.isArray(entry.actionPlan) ? JSON.stringify(entry.actionPlan) : "[]",
       updated_at: new Date().toISOString()
     };
 
-    // First check if entry already exists
-    const checkUrl = `${baseUrl}/rest/v1/journal_entries?id=eq.${encodeURIComponent(entry.id)}`;
+    // Check if entry already exists
+    const checkUrl = `${baseUrl}/rest/v1/entries?id=eq.${encodeURIComponent(entry.id)}`;
     const checkRes = await fetch(checkUrl, {
       method: "GET",
       headers: {
@@ -1178,7 +1209,7 @@ app.post("/api/journal-entries", async (req, res) => {
       const checkData = await checkRes.json();
       if (Array.isArray(checkData) && checkData.length > 0) {
         // Exists, perform PATCH
-        const updateUrl = `${baseUrl}/rest/v1/journal_entries?id=eq.${encodeURIComponent(entry.id)}`;
+        const updateUrl = `${baseUrl}/rest/v1/entries?id=eq.${encodeURIComponent(entry.id)}`;
         upsertRes = await fetch(updateUrl, {
           method: "PATCH",
           headers: {
@@ -1191,7 +1222,7 @@ app.post("/api/journal-entries", async (req, res) => {
         });
       } else {
         // Doesn't exist, perform POST
-        const insertUrl = `${baseUrl}/rest/v1/journal_entries`;
+        const insertUrl = `${baseUrl}/rest/v1/entries`;
         upsertRes = await fetch(insertUrl, {
           method: "POST",
           headers: {
@@ -1212,7 +1243,7 @@ app.post("/api/journal-entries", async (req, res) => {
 
     if (!upsertRes.ok) {
       const detail = await upsertRes.text();
-      throw new Error(`Supabase journal_entries write failed with status ${upsertRes.status}: ${detail}`);
+      throw new Error(`Supabase entries write failed with status ${upsertRes.status}: ${detail}`);
     }
 
     const data = await upsertRes.json();

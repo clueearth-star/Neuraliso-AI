@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { JournalEntry } from "../types";
 import { PremiumBlueprintView } from "./PremiumBlueprintView";
 import { SystemDiagnostics } from "./SystemDiagnostics";
+import { Settings, Save, X, Edit3, Check, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ProfileViewProps {
   entries: JournalEntry[];
@@ -12,6 +13,16 @@ interface ProfileViewProps {
     premiumActive: boolean;
     themeMode: "light" | "neutral";
     notificationsEnabled: boolean;
+    wellnessGoals?: string[];
+    ageRange?: string;
+    challenges?: string[];
+    coping?: string[];
+    initialScore?: number;
+    actionPlan?: any[];
+    calmXP?: number;
+    currentStreak?: number;
+    milestonesMet?: string[];
+    preferredCheckinTime?: string;
   } | null;
   onUpdateProfile?: (fields: Partial<any>) => void;
   onSignOut?: () => void;
@@ -38,6 +49,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const [mockHeartRate, setMockHeartRate] = useState(72);
   const [isMeasuringHR, setIsMeasuringHR] = useState(true);
+
+  // Edit Preferences state
+  const [isEditingPrefs, setIsEditingPrefs] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editAgeRange, setEditAgeRange] = useState("25-34");
+  const [editCheckinTime, setEditCheckinTime] = useState("09:00 AM");
+  const [editGoals, setEditGoals] = useState<string[]>([]);
+  const [editChallenges, setEditChallenges] = useState<string[]>([]);
+  const [editCoping, setEditCoping] = useState<string[]>([]);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const displayName = user?.displayName || userProfile?.displayName || "Neuraliso Seeker";
+
+  // Sync edit states when profile is loaded
+  useEffect(() => {
+    if (userProfile) {
+      setEditDisplayName(userProfile.displayName || displayName);
+      setEditAgeRange(userProfile.ageRange || "25-34");
+      setEditCheckinTime(userProfile.preferredCheckinTime || "09:00 AM");
+      setEditGoals(userProfile.wellnessGoals || []);
+      setEditChallenges(userProfile.challenges || []);
+      setEditCoping(userProfile.coping || []);
+    } else {
+      setEditDisplayName(displayName);
+    }
+  }, [userProfile, displayName]);
 
   // Wearable simulated heart rate oscillation
   useEffect(() => {
@@ -83,7 +120,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     : "6.5";
 
   // Display metadata
-  const displayName = user?.displayName || userProfile?.displayName || "Neuraliso Seeker";
   const userInitials = displayName.charAt(0).toUpperCase() || "N";
   const userPhoto = user?.photoURL || null;
   const secureIdSuffix = user?.uid ? `${user.uid.slice(0, 8)}...` : "OFFLINE-SANDBOX";
@@ -311,6 +347,213 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               Warm Neutral
             </button>
           </div>
+        </div>
+
+        {/* Edit Preferences section */}
+        <div className="border-t border-gray-150 pt-4">
+          <div className="flex justify-between items-center text-xs">
+            <div>
+              <span className="font-bold text-dark-text block">Edit Onboarding Preferences</span>
+              <span className="text-[10px] text-muted-text">Update your primary wellness goals, challenges, and check-in times</span>
+            </div>
+            <button
+              id="toggle-preferences-edit-btn"
+              onClick={() => setIsEditingPrefs(!isEditingPrefs)}
+              className="text-xs bg-soft-green text-deep-sage hover:bg-soft-green/80 py-1.5 px-3.5 rounded-full font-bold transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <Settings className="w-3 h-3" />
+              <span>{isEditingPrefs ? "Close" : "Edit"}</span>
+            </button>
+          </div>
+
+          {isEditingPrefs && (
+            <div className="mt-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-4 animate-fade-in text-xs">
+              {/* Display Name */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">Display Name</label>
+                <input
+                  type="text"
+                  value={editDisplayName}
+                  onChange={(e) => setEditDisplayName(e.target.value)}
+                  placeholder="Neuraliso Seeker"
+                  className="w-full bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs text-dark-text focus:outline-none focus:border-primary-sage"
+                />
+              </div>
+
+              {/* Age Range */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">Age Range</label>
+                <select
+                  value={editAgeRange}
+                  onChange={(e) => setEditAgeRange(e.target.value)}
+                  className="w-full bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs text-dark-text focus:outline-none focus:border-primary-sage"
+                >
+                  <option value="18-24">18-24</option>
+                  <option value="25-34">25-34</option>
+                  <option value="35-44">35-44</option>
+                  <option value="45-54">45-54</option>
+                  <option value="55+">55+</option>
+                </select>
+              </div>
+
+              {/* Preferred Check-in Time */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">Preferred Check-In Time</label>
+                <input
+                  type="text"
+                  value={editCheckinTime}
+                  onChange={(e) => setEditCheckinTime(e.target.value)}
+                  placeholder="09:00 AM"
+                  className="w-full bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs text-dark-text focus:outline-none focus:border-primary-sage"
+                />
+                <span className="text-[9px] text-muted-text mt-0.5 block">Format: HH:MM AM/PM</span>
+              </div>
+
+              {/* Wellness Goals */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-2">Wellness Goals</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    "Reduce Anxiety & Stress",
+                    "Improve Sleep Quality & Circadian Rhythm",
+                    "Regulate Heart Rate Variability (HRV)",
+                    "Acquire CBT Cognitive Techniques",
+                    "Foil Work Burnout",
+                    "Foster Biological Serenity"
+                  ].map((goal) => {
+                    const isSelected = editGoals.includes(goal);
+                    return (
+                      <button
+                        key={goal}
+                        type="button"
+                        onClick={() => {
+                          setEditGoals((prev) =>
+                            isSelected ? prev.filter((g) => g !== goal) : [...prev, goal]
+                          );
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl border text-[11px] transition-all flex items-center justify-between ${
+                          isSelected
+                            ? "border-primary-sage bg-soft-green/20 text-deep-sage font-semibold"
+                            : "border-gray-150 bg-white text-muted-text hover:bg-gray-50"
+                        }`}
+                      >
+                        <span>{goal}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-deep-sage" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Challenges */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-2">Core Challenges</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    "Constant Worry & Ruminating Loops",
+                    "Work/School Pressure & Fast Schedules",
+                    "Insomnia & Sleep Disturbances",
+                    "Social Connection Tension",
+                    "Sudden Adrenaline or Panic Waves"
+                  ].map((challenge) => {
+                    const isSelected = editChallenges.includes(challenge);
+                    return (
+                      <button
+                        key={challenge}
+                        type="button"
+                        onClick={() => {
+                          setEditChallenges((prev) =>
+                            isSelected ? prev.filter((c) => c !== challenge) : [...prev, challenge]
+                          );
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl border text-[11px] transition-all flex items-center justify-between ${
+                          isSelected
+                            ? "border-indigo-200 bg-indigo-50/30 text-indigo-900 font-semibold"
+                            : "border-gray-150 bg-white text-muted-text hover:bg-gray-50"
+                        }`}
+                      >
+                        <span>{challenge}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-700" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Coping Mechanisms */}
+              <div>
+                <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-2">Preferred Coping Methods</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    "Vagal Box & 4-7-8 Deep Somatic Breathing",
+                    "5-4-3-2-1 Somatic Sensory Grounding",
+                    "Alpha/Theta Binaural Wave Solfeggio Mixers",
+                    "Daily CBT Automated Cognitive Reconstruction"
+                  ].map((cope) => {
+                    const isSelected = editCoping.includes(cope);
+                    return (
+                      <button
+                        key={cope}
+                        type="button"
+                        onClick={() => {
+                          setEditCoping((prev) =>
+                            isSelected ? prev.filter((c) => c !== cope) : [...prev, cope]
+                          );
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl border text-[11px] transition-all flex items-center justify-between ${
+                          isSelected
+                            ? "border-emerald-200 bg-emerald-50/30 text-emerald-950 font-semibold"
+                            : "border-gray-150 bg-white text-muted-text hover:bg-gray-50"
+                        }`}
+                      >
+                        <span>{cope}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-emerald-800" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (onUpdateProfile) {
+                      await onUpdateProfile({
+                        displayName: editDisplayName.trim() || "Neuraliso Seeker",
+                        ageRange: editAgeRange,
+                        preferredCheckinTime: editCheckinTime.trim(),
+                        wellnessGoals: editGoals,
+                        challenges: editChallenges,
+                        coping: editCoping,
+                        completedOnboarding: true
+                      });
+                      setSaveSuccess(true);
+                      setTimeout(() => setSaveSuccess(false), 2500);
+                    }
+                  }}
+                  className="flex-1 bg-deep-sage text-white font-bold py-2 px-4 rounded-full flex items-center justify-center gap-1.5 hover:bg-primary-sage active:scale-95 transition-all cursor-pointer text-xs"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Preferences</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPrefs(false)}
+                  className="bg-gray-200 text-muted-text hover:text-dark-text font-bold py-2 px-4 rounded-full active:scale-95 transition-all cursor-pointer text-xs"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {saveSuccess && (
+                <div className="text-center text-[10px] text-green-700 font-bold bg-green-50 border border-green-200 p-2 rounded-xl animate-fade-in">
+                  ✓ Preferences successfully synchronized to your secure Supabase account!
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Privacy options */}

@@ -99,6 +99,7 @@ function AppContent({
     calmXP?: number;
     currentStreak?: number;
     milestonesMet?: string[];
+    preferredCheckinTime?: string;
   } | null>(null);
 
   // Fallback state if user continues offline
@@ -187,13 +188,14 @@ function AppContent({
           const data = await res.json();
           
           if (data) {
+            const hasCompletedOnboarding = data.completedOnboarding ?? false;
             setUserProfile({
               userId: data.userId || user.id,
               displayName: data.displayName || user.displayName || "Neuraliso Seeker",
               premiumActive: data.premiumActive ?? false,
               themeMode: data.themeMode || "light",
               notificationsEnabled: data.notificationsEnabled ?? true,
-              completedOnboarding: data.completedOnboarding ?? true,
+              completedOnboarding: hasCompletedOnboarding,
               wellnessGoals: data.wellnessGoals,
               ageRange: data.ageRange,
               challenges: data.challenges,
@@ -202,11 +204,16 @@ function AppContent({
               actionPlan: data.actionPlan,
               calmXP: data.calmXP ?? 120,
               currentStreak: data.currentStreak ?? 5,
-              milestonesMet: data.milestonesMet ?? ["Core Breathing"]
+              milestonesMet: data.milestonesMet ?? ["Core Breathing"],
+              preferredCheckinTime: data.preferredCheckinTime
             });
-            // Skip onboarding for existing records
-            setIsOnboarded(true);
-            localStorage.setItem("neuraliso_onboarded", "true");
+            if (hasCompletedOnboarding) {
+              setIsOnboarded(true);
+              localStorage.setItem("neuraliso_onboarded", "true");
+            } else {
+              setIsOnboarded(false);
+              localStorage.removeItem("neuraliso_onboarded");
+            }
           } else {
             // Check if the Clerk account or user account was already created previously (older than 2 mins)
             const isAccountAlreadyCreated = user.createdAt
@@ -417,7 +424,9 @@ function AppContent({
   // Onboarding wizard data compiler
   const handleCompleteOnboarding = async (data: any) => {
     // Record baseline stress slider
-    setCurrentStress(data.assessment.stress);
+    if (data.assessment && typeof data.assessment.stress === "number") {
+      setCurrentStress(data.assessment.stress);
+    }
 
     // Save profile settings
     const profileData = {
@@ -435,7 +444,8 @@ function AppContent({
       completedOnboarding: true,
       calmXP: userProfile?.calmXP ?? 120,
       currentStreak: userProfile?.currentStreak ?? 5,
-      milestonesMet: userProfile?.milestonesMet ?? ["Core Breathing"]
+      milestonesMet: userProfile?.milestonesMet ?? ["Core Breathing"],
+      preferredCheckinTime: data.preferredCheckinTime || "08:00 PM"
     };
 
     setOnboardingProfile(profileData);
@@ -472,7 +482,8 @@ function AppContent({
         actionPlan: profileData.actionPlan,
         calmXP: profileData.calmXP,
         currentStreak: profileData.currentStreak,
-        milestonesMet: profileData.milestonesMet
+        milestonesMet: profileData.milestonesMet,
+        preferredCheckinTime: profileData.preferredCheckinTime
       });
     } else {
       setIsOfflineSandbox(true);
@@ -492,7 +503,8 @@ function AppContent({
         actionPlan: data.actionPlan,
         calmXP: 120,
         currentStreak: 5,
-        milestonesMet: ["Core Breathing"]
+        milestonesMet: ["Core Breathing"],
+        preferredCheckinTime: data.preferredCheckinTime || "08:00 PM"
       });
     }
 

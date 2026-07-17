@@ -215,60 +215,29 @@ function AppContent({
               localStorage.removeItem("neuraliso_onboarded");
             }
           } else {
-            // Check if the Clerk account or user account was already created previously (older than 2 mins)
-            const isAccountAlreadyCreated = user.createdAt
-              ? (Date.now() - new Date(user.createdAt).getTime() > 120000)
-              : false;
+            // Brand new user or no existing profile in database, force onboarding wizard
+            const initialProfile = {
+              userId: user.id,
+              displayName: user.displayName || "Neuraliso Seeker",
+              premiumActive: false,
+              themeMode: "light" as const,
+              notificationsEnabled: true,
+              completedOnboarding: false,
+              calmXP: 120,
+              currentStreak: 5,
+              milestonesMet: ["Core Breathing"]
+            };
 
-            if (isAccountAlreadyCreated) {
-              // Existing account on Clerk, bypass onboarding
-              const initialProfile = {
-                userId: user.id,
-                displayName: user.displayName || "Neuraliso Seeker",
-                premiumActive: false,
-                themeMode: "light" as const,
-                notificationsEnabled: true,
-                completedOnboarding: true,
-                calmXP: 120,
-                currentStreak: 5,
-                milestonesMet: ["Core Breathing"]
-              };
-              
-              // Save to Supabase
-              await fetch("/api/user-profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...initialProfile, id: user.id })
-              });
+            // Save to Supabase
+            await fetch("/api/user-profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...initialProfile, id: user.id })
+            });
 
-              setUserProfile(initialProfile);
-              setIsOnboarded(true);
-              localStorage.setItem("neuraliso_onboarded", "true");
-            } else {
-              // Brand new user, ask questions
-              const initialProfile = {
-                userId: user.id,
-                displayName: user.displayName || "Neuraliso Seeker",
-                premiumActive: false,
-                themeMode: "light" as const,
-                notificationsEnabled: true,
-                completedOnboarding: false,
-                calmXP: 120,
-                currentStreak: 5,
-                milestonesMet: ["Core Breathing"]
-              };
-
-              // Save to Supabase
-              await fetch("/api/user-profile", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...initialProfile, id: user.id })
-              });
-
-              setUserProfile(initialProfile);
-              setIsOnboarded(false);
-              localStorage.removeItem("neuraliso_onboarded");
-            }
+            setUserProfile(initialProfile);
+            setIsOnboarded(false);
+            localStorage.removeItem("neuraliso_onboarded");
           }
 
           // Fetch user's journal entries from Supabase Proxy

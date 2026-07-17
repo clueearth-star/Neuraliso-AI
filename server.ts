@@ -46,9 +46,28 @@ function getSupabaseKey(): string {
  */
 function getSupabaseUrl(): string {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_URL.trim() !== "") {
-    return process.env.SUPABASE_URL.trim();
+    const rawUrl = process.env.SUPABASE_URL.trim();
+    if (rawUrl.startsWith("http") && !rawUrl.includes("supabase.com/dashboard") && !rawUrl.includes("project/")) {
+      return rawUrl;
+    }
   }
-  return "https://tmmrquzeoykocirbempg.supabase.co";
+  // Fallback: extract from SUPABASE_SERVICE_ROLE_KEY JWT payload
+  try {
+    const key = getSupabaseKey();
+    if (key) {
+      const parts = key.split(".");
+      if (parts.length === 3) {
+        const payloadStr = Buffer.from(parts[1], "base64").toString("utf8");
+        const payload = JSON.parse(payloadStr);
+        if (payload && payload.ref) {
+          return `https://${payload.ref}.supabase.co`;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Supabase URL Parser] Failed to parse ref from JWT:", err);
+  }
+  return "https://siewuccllcisezwyiyaz.supabase.co";
 }
 
 const app = express();

@@ -1,0 +1,22 @@
+EDIT TO server.ts
+------------------
+Do NOT replace your whole server.ts — just change the very last part.
+
+Scroll to the BOTTOM of server.ts. You'll find a line that just says:
+
+    startServer();
+
+Replace that single line with this:
+
+    if (!process.env.VERCEL) {
+      startServer();
+    }
+
+    export default app;
+
+That's it — nothing else in the file needs to change. This tells the app
+to only auto-start its own server when NOT running on Vercel (Vercel runs
+it differently, through api/index.ts instead), and makes the app itself
+available for Vercel to use via that export.
+
+Then commit.

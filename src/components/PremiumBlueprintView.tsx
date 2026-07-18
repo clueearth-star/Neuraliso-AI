@@ -5,6 +5,8 @@ import { Sparkles, ShieldCheck, FileCheck, Brain, Flame, FileText, ChevronRight,
 interface PremiumBlueprintViewProps {
   entries: JournalEntry[];
   userName: string;
+  premiumActive: boolean;
+  userId?: string;
 }
 
 interface BlueprintData {
@@ -23,18 +25,22 @@ interface BlueprintData {
   poeticPrescription: string;
 }
 
-export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entries, userName }) => {
+export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entries, userName, premiumActive, userId }) => {
   const [blueprint, setBlueprint] = useState<BlueprintData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [completedHomework, setCompletedHomework] = useState<Record<number, boolean>>({});
 
   const generateBlueprint = async () => {
+    if (!premiumActive) {
+      alert("Please upgrade to Premium to request your custom Clinical Cognitive Well-being Blueprint.");
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch("/api/premium-blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries, userName })
+        body: JSON.stringify({ entries, userName, userId })
       });
       const contentType = response.headers.get("content-type");
       if (response.ok && contentType && contentType.includes("application/json")) {
@@ -88,26 +94,53 @@ export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entr
         {/* Action Button to trigger if empty */}
         {!blueprint && (
           <div className="py-4 text-center">
-            <button
-              onClick={generateBlueprint}
-              disabled={loading}
-              className="w-full max-w-sm mx-auto py-4 px-6 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-amber-500/15 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Synthesizing Luxury Blueprint...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-slate-950 fill-current" />
-                  <span>Request Elite Diagnostic Report</span>
-                </>
-              )}
-            </button>
-            <p className="text-[9px] text-slate-400 mt-2 font-mono">
-              *Synthesizes biometric profiles from {entries.length || 7} logged wellness records.
-            </p>
+            {premiumActive ? (
+              <>
+                <button
+                  onClick={generateBlueprint}
+                  disabled={loading}
+                  className="w-full max-w-sm mx-auto py-4 px-6 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-amber-500/15 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Synthesizing Luxury Blueprint...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-slate-950 fill-current" />
+                      <span>Request Elite Diagnostic Report</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[9px] text-slate-400 mt-2 font-mono">
+                  *Synthesizes biometric profiles from {entries.length || 7} logged wellness records.
+                </p>
+              </>
+            ) : (
+              <div className="p-6 rounded-3xl bg-slate-950/50 border border-amber-500/20 max-w-md mx-auto space-y-4">
+                <span className="inline-flex items-center gap-1.5 text-[9px] uppercase font-mono tracking-widest text-amber-500 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                  🔒 Premium Feature
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed max-w-sm mx-auto">
+                  Get custom bi-weekly CBT reports, vagus somatic exercise homework, and personalized clinical diagnostics based on your historical emotional patterns.
+                </p>
+                <button
+                  onClick={() => {
+                    const btn = document.getElementById("toggle-premium-membership");
+                    if (btn) {
+                      btn.click();
+                    } else {
+                      alert("Please access the Profile page Settings Center to upgrade.");
+                    }
+                  }}
+                  className="px-6 py-2.5 rounded-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs uppercase tracking-widest transition active:scale-95 flex items-center justify-center gap-1.5 mx-auto font-sans"
+                >
+                  <span>Unlock Blueprint Now</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 

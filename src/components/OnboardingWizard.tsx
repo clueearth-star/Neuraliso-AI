@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useClerk } from "@clerk/clerk-react";
 import { 
   auth, 
   loginWithGoogle as firebaseLoginWithGoogle, 
@@ -47,6 +48,7 @@ interface OnboardingWizardProps {
     initialScore: number;
     actionPlan: string[];
     preferredCheckinTime: string;
+    premiumActive?: boolean;
   }) => void;
   onEnterEnterpriseDemo: () => void;
   currentUser?: any;
@@ -67,6 +69,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   loginAnonymously,
   isAuth0Active
 }) => {
+  let clerk: any = null;
+  try {
+    clerk = useClerk();
+  } catch (e) {
+    // Graceful fallback for non-clerk sandbox environments
+  }
+
   // Firebase Auth Adaptation
   const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -173,7 +182,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const [subView, setSubView] = useState<"landing" | "signup" | "step1" | "step2" | "step3" | "step4">(() => {
+  const [subView, setSubView] = useState<"landing" | "signup" | "step1" | "step2" | "step3" | "step4" | "subscriptionOffer">(() => {
     return isSignedIn ? "step1" : "landing";
   });
   
@@ -310,7 +319,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     return plans;
   };
 
-  const handleTriggerComplete = () => {
+  const handleTriggerComplete = (premiumActiveOverride?: boolean) => {
     const calculatedScore = calculateWellnessScore();
     const actionPlan = compileFirstActionPlan();
     
@@ -325,7 +334,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       notifications,
       initialScore: calculatedScore,
       actionPlan,
-      preferredCheckinTime
+      preferredCheckinTime,
+      premiumActive: premiumActiveOverride !== undefined ? premiumActiveOverride : false
     });
   };
 
@@ -1133,13 +1143,139 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
               </div>
 
-              {/* Master Dashboard launcher */}
+              {/* Master Dashboard launcher - Proceeds to skippable subscription offer */}
               <button
-                onClick={handleTriggerComplete}
+                onClick={() => setSubView("subscriptionOffer")}
                 className="w-full bg-slate-950 hover:bg-slate-900 text-white font-semibold font-sans py-4 rounded-full text-xs uppercase tracking-widest text-center block shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 cursor-pointer mt-6"
               >
                 Launch Personalized Space Suite
               </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* 7. SUBSCRIPTION / UPGRADE FIRST-TIME OFFER SCREEN */}
+        {subView === "subscriptionOffer" && (
+          <motion.div
+            key="subscriptionOffer"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            transition={{ type: "spring", damping: 15 }}
+            className="w-full max-w-lg mx-auto z-10 px-3"
+          >
+            <div className="bg-white/90 backdrop-blur-xl p-7 space-y-6 text-left shadow-2xl relative border border-white/60" style={{ borderRadius: MELTED_RAD_L }}>
+              
+              <div className="flex justify-between items-start pb-2 border-b">
+                <div className="space-y-1">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-amber-800 bg-amber-500/20 px-2.5 py-0.5 rounded-full">
+                    <Sparkles className="w-3 h-3 animate-pulse" /> Neuraliso Premium
+                  </span>
+                  <h3 className="text-xl font-serif italic text-dark-text font-bold">Step Into Complete Emotional Freedom</h3>
+                </div>
+                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+                  <Brain className="w-5 h-5" />
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-text leading-relaxed">
+                Unlock scientific mental wellness diagnostics, priority high-reasoning companion models, and uncompromised somatic breathing generators.
+              </p>
+
+              {/* Pricing Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Monthly card */}
+                <div className="p-4 border border-slate-200 rounded-2xl bg-slate-50/50 flex flex-col justify-between transition hover:border-slate-300">
+                  <div>
+                    <span className="text-[8px] uppercase font-mono tracking-wider text-slate-500 font-bold">Monthly Plan</span>
+                    <h4 className="text-xs font-bold text-slate-800 mt-0.5">Monthly Compassion</h4>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-normal">Tactical ongoing anxiety relief.</p>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-slate-900">$4.99</span>
+                    <span className="text-[10px] text-slate-500">/ mo</span>
+                  </div>
+                </div>
+
+                {/* Yearly card */}
+                <div className="p-4 border-2 border-amber-400 bg-amber-500/[0.02] rounded-2xl flex flex-col justify-between transition relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-amber-500 text-[8px] font-bold text-slate-950 px-2 py-0.5 rounded-bl-lg uppercase tracking-wider font-mono scale-90 origin-top-right">
+                    Save 20%
+                  </div>
+                  <div>
+                    <span className="text-[8px] uppercase font-mono tracking-wider text-amber-700 font-bold">Annual Plan</span>
+                    <h4 className="text-xs font-bold text-slate-800 mt-0.5">Yearly Sanctuary</h4>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-normal">Dedicated deep habit changes.</p>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-slate-900">$48.00</span>
+                    <span className="text-[10px] text-slate-500">/ yr</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Feature highlights */}
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                  Included Premium VIP Features:
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span><strong>Infinite</strong> Journal Logs</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span>Priority <strong>CBT AI Chat</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span>Realistic <strong>Vocal CBT</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span><strong>Stress</strong> forecasting</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-2">
+                <button
+                  onClick={() => {
+                    if (clerk && typeof clerk.openUserProfile === "function") {
+                      try {
+                        clerk.openUserProfile({ path: "billing" });
+                      } catch (e) {
+                        clerk.openUserProfile();
+                      }
+                    } else {
+                      alert("Offline Sandbox Mode: Premium simulated upgrade enabled!");
+                    }
+                    handleTriggerComplete(true);
+                  }}
+                  className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold font-sans py-3.5 rounded-full text-xs uppercase tracking-wider text-center block shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 cursor-pointer"
+                >
+                  Access Premium Sanctuary Now
+                </button>
+
+                <div className="flex justify-center gap-4 text-xs font-medium">
+                  <button
+                    onClick={() => handleTriggerComplete(false)}
+                    className="text-slate-500 hover:text-slate-800 underline transition cursor-pointer bg-transparent border-0"
+                  >
+                    Continue with Free Tier
+                  </button>
+                  <span className="text-slate-350">•</span>
+                  <button
+                    onClick={() => handleTriggerComplete(false)}
+                    className="text-slate-500 hover:text-slate-800 underline transition cursor-pointer bg-transparent border-0"
+                  >
+                    Maybe later
+                  </button>
+                </div>
+              </div>
+
             </div>
           </motion.div>
         )}

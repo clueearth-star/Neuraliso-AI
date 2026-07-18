@@ -64,9 +64,11 @@ const SAFETY_KEYWORDS = [
 interface ChatViewProps {
   onTriggerSafety: (triggered: boolean) => void;
   onNavigate?: (view: any) => void;
+  premiumActive: boolean;
+  userId?: string;
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate, premiumActive, userId }) => {
   const [messages, setMessages] = useState<Message[]>(() => {
     // Attempt load from localStorage
     const saved = localStorage.getItem("neuraliso_chat_history");
@@ -182,6 +184,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate 
 
     if (!cleanedSpeech) return;
 
+    if (!premiumActive) {
+      // Free tier users fallback directly to local system speech synthesis
+      speakWithWebSpeech(cleanedSpeech);
+      return;
+    }
+
     // Try ElevenLabs realistic voice via backend proxy first!
     try {
       setIsSpeaking(true);
@@ -190,7 +198,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: cleanedSpeech,
-          voiceId: selectedVoice
+          voiceId: selectedVoice,
+          userId: userId
         })
       });
 

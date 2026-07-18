@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import { JournalEntry } from "../types";
 import { PremiumBlueprintView } from "./PremiumBlueprintView";
 import { SystemDiagnostics } from "./SystemDiagnostics";
-import { Settings, Save, X, Edit3, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, Save, X, Edit3, Check, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
+import { useClerk } from "@clerk/clerk-react";
+import { PricingModal } from "./PricingModal";
 
 interface ProfileViewProps {
   entries: JournalEntry[];
@@ -38,10 +40,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // Determine if utilizing actual database or sandbox defaults
   const isAuthEnabled = !!user;
 
+  // Clerk hook for billing portal redirection
+  let clerk: any = null;
+  try {
+    clerk = useClerk();
+  } catch (e) {
+    // Graceful fallback for non-clerk sandbox runtimes
+  }
+
   // Local state fallbacks if guest/sandbox
   const [localPremium, setLocalPremium] = useState(false);
   const [localNotifications, setLocalNotifications] = useState(true);
   const [localTheme, setLocalTheme] = useState<"light" | "neutral">("light");
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
 
   const premiumActive = userProfile ? (userProfile.premiumActive ?? false) : localPremium;
   const notifications = userProfile ? (userProfile.notificationsEnabled ?? true) : localNotifications;
@@ -91,10 +102,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   }, [isMeasuringHR]);
 
   const togglePremium = () => {
-    if (onUpdateProfile) {
-      onUpdateProfile({ premiumActive: !premiumActive });
+    // Instead of automatically toggling premium state, we show our beautiful details and pricing comparison!
+    setIsPricingOpen(true);
+  };
+
+  const handleExecuteUpgrade = () => {
+    if (clerk && typeof clerk.openUserProfile === "function") {
+      try {
+        clerk.openUserProfile({ path: "billing" });
+        setIsPricingOpen(false);
+      } catch (e) {
+        console.warn("[Clerk billing profile route fallback]", e);
+        clerk.openUserProfile();
+      }
     } else {
-      setLocalPremium((p) => !p);
+      // Offline sandbox toggle fallback for preview purposes
+      if (onUpdateProfile) {
+        onUpdateProfile({ premiumActive: !premiumActive });
+      } else {
+        setLocalPremium((p) => !p);
+      }
+      setIsPricingOpen(false);
+    }
+  };
+
+  const handleManageClerkBilling = () => {
+    if (clerk && typeof clerk.openUserProfile === "function") {
+      try {
+        clerk.openUserProfile({ path: "billing" });
+      } catch (e) {
+        clerk.openUserProfile();
+      }
+    } else {
+      // Local fallback toggle
+      if (onUpdateProfile) {
+        onUpdateProfile({ premiumActive: !premiumActive });
+      } else {
+        setLocalPremium((p) => !p);
+      }
     }
   };
 
@@ -245,7 +290,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* ELITE COGNITIVE BLUEPRINT SECTION */}
-      <PremiumBlueprintView entries={entries} userName={displayName} />
+      <PremiumBlueprintView 
+        entries={entries} 
+        userName={displayName} 
+        premiumActive={premiumActive}
+        userId={user?.id || userProfile?.userId}
+      />
       
       {/* 3. PREMIUM PREMIUM SAAS FEATURES CHECK IN CARD */}
       <div className="premium-card p-6 border relative overflow-hidden bg-white">
@@ -280,10 +330,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* Upgrade Call to action */}
         <button
           id="toggle-premium-membership"
-          onClick={togglePremium}
+          onClick={premiumActive ? handleManageClerkBilling : togglePremium}
           className="w-full bg-deep-sage text-white text-xs font-bold py-3 px-5 rounded-full shadow-lg shadow-deep-sage/15 hover:bg-primary-sage transition-all active:scale-95 flex items-center justify-between cursor-pointer"
         >
-          <span>{premiumActive ? "Manage VIP Subscription" : "Activate 7-Day Free Trial ($4.99/mo)"}</span>
+          <span>{premiumActive ? "Manage Premium Subscription" : "Activate Premium Upgrade ($4.99/mo)"}</span>
           <span className="font-mono">{premiumActive ? "ACTIVE ✓" : "SIGN UP →"}</span>
         </button>
       </div>
@@ -556,6 +606,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
 
+        {/* Billing & Subscription */}
+        <div className="flex justify-between items-center text-xs pt-3 border-t border-gray-150">
+          <div>
+            <span className="font-bold text-dark-text block">Billing & Subscriptions</span>
+            <span className="text-[10px] text-muted-text">
+              {premiumActive ? "Active Premium VIP plan" : "Free basic sandboxed plan"}
+            </span>
+          </div>
+          <button
+            onClick={premiumActive ? handleManageClerkBilling : () => setIsPricingOpen(true)}
+            className="text-[10px] text-deep-sage hover:text-primary-sage underline font-semibold flex items-center gap-1 cursor-pointer font-mono uppercase tracking-wide"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-deep-sage" />
+            <span>{premiumActive ? "Manage subscription" : "Upgrade now"}</span>
+          </button>
+        </div>
+
         {/* Privacy options */}
         <div className="flex justify-between items-center text-xs">
           <div>
@@ -588,6 +655,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* 5. SYSTEM PERFORMANCE AND TELEMETRY PORTAL */}
       <SystemDiagnostics />
+
+      <PricingModal 
+        isOpen={isPricingOpen} 
+        onClose={() => setIsPricingOpen(false)} 
+        onUpgrade={handleExecuteUpgrade} 
+        premiumActive={premiumActive}
+      />
 
       <div className="text-center font-mono text-[9px] text-muted-text/80 space-y-1">
         <p>NEURALISO AI SECURED DB AUTH ROUTING PROTOCOL ACTIVE</p>

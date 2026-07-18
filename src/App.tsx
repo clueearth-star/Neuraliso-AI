@@ -188,11 +188,23 @@ function AppContent({
           const data = await res.json();
           
           if (data) {
+            // Real-time server-side verified subscription status check (never trust client flags)
+            let verifiedPremium = data.premiumActive ?? false;
+            try {
+              const subRes = await fetch(`/api/verify-subscription?userId=${user.id}`);
+              if (subRes.ok) {
+                const subData = await subRes.json();
+                verifiedPremium = subData.premiumActive;
+              }
+            } catch (subErr) {
+              console.warn("[Subscription verification fallback error]:", subErr);
+            }
+
             const hasCompletedOnboarding = data.completedOnboarding ?? false;
             setUserProfile({
               userId: data.userId || user.id,
               displayName: data.displayName || user.displayName || "Neuraliso Seeker",
-              premiumActive: data.premiumActive ?? false,
+              premiumActive: verifiedPremium,
               themeMode: data.themeMode || "light",
               notificationsEnabled: data.notificationsEnabled ?? true,
               completedOnboarding: hasCompletedOnboarding,
@@ -337,7 +349,7 @@ function AppContent({
     }
 
     try {
-      await fetch("/api/journal-entries", {
+      const response = await fetch("/api/journal-entries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -347,6 +359,24 @@ function AppContent({
           entry: newEntry
         })
       });
+      
+      if (response.ok) {
+        setEntries((prev) => [...prev, newEntry]);
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 403) {
+          alert(errData.error || "Free Plan Limit Reached: Please upgrade to Premium to save more than 5 journal entries.");
+          // Trigger the premium upgrade pricing modal automatically!
+          const btn = document.getElementById("toggle-premium-membership");
+          if (btn) {
+            btn.click();
+          } else {
+            setActiveView("profile");
+          }
+        } else {
+          alert("Could not save journal entry: " + (errData.error || "Internal Error"));
+        }
+      }
     } catch (error) {
       console.warn("Saving journal entry to Supabase failed or went offline:", error);
     }
@@ -401,7 +431,7 @@ function AppContent({
     const profileData = {
       userId: user?.id || "OFFLINE-SANDBOX-USER",
       displayName: data.displayName,
-      premiumActive: false,
+      premiumActive: data.premiumActive || false,
       themeMode: "light" as const,
       notificationsEnabled: data.notifications,
       wellnessGoals: data.wellnessGoals,
@@ -634,6 +664,8 @@ function AppContent({
               <ChatView 
                 onTriggerSafety={(triggered) => setCrisisActive(triggered)} 
                 onNavigate={(v) => setActiveView(v)}
+                premiumActive={userProfile?.premiumActive ?? false}
+                userId={user?.id}
               />
             )}
 

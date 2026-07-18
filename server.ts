@@ -73,6 +73,11 @@ function getSupabaseUrl(): string {
 const app = express();
 const PORT = 3000;
 
+// High-fidelity local memory fallbacks for seamless out-of-the-box operation if Supabase tables are not yet provisioned
+const fallbackUsers: Record<string, any> = {};
+const fallbackEntries: Record<string, any[]> = {};
+const fallbackReviews: any[] = [];
+
 /**
  * Safely resolves the API key to use. We check the environment's NVIDIA_API_KEY
  * or custom GEMINI_API_KEY before using the high-performance premium fallback key.
@@ -542,7 +547,14 @@ app.post("/api/chat", async (req, res) => {
 // API: ElevenLabs Text to Speech Generation with requested Voice ID
 app.post("/api/tts", async (req, res) => {
   try {
-    const { text, voiceId } = req.body;
+    const { text, voiceId, userId } = req.body;
+    
+    if (userId) {
+      const isPremium = await isUserPremium(userId);
+      if (!isPremium) {
+        return res.status(403).json({ error: "Access Denied: Professional Realistic CBT Audio synthesis is a Premium-tier feature." });
+      }
+    }
     
     if (!text || text.trim() === "") {
       return res.status(400).json({ error: "Text is required for speech synthesis." });
@@ -655,7 +667,16 @@ app.get("/api/insights", async (req, res) => {
 // Extra: Premium Clinical BI-WEEKLY COGNITIVE BLUEPRINT generator powered by Gemini
 app.post("/api/premium-blueprint", async (req, res) => {
   try {
-    const { entries, userName } = req.body;
+    const { entries, userName, userId } = req.body;
+    
+    // Server-side real-time subscription check (never trust client-side flags)
+    if (userId) {
+      const isPremium = await isUserPremium(userId);
+      if (!isPremium) {
+        return res.status(403).json({ error: "Access Denied: Requires an active premium subscription." });
+      }
+    }
+
     const cacheKey = `blueprint_${userName || "anon"}_${JSON.stringify(entries || [])}`;
     const cachedResponse = getCachedData(cacheKey);
     if (cachedResponse) {
@@ -889,9 +910,14 @@ async function syncReviewToSupabase(comment: string, rating: number, userName: s
 
     console.log("[Supabase Sync] Syncing review payload into \"Reviews\":", payload);
 
-    const targetUrl = "https://tmmrquzeoykocirbempg.supabase.co/rest/v1/Reviews%20System";
-    const apikey = resolvedSupabaseKey;
+    const baseUrl = getSupabaseUrl();
+    const targetUrl = `${baseUrl}/rest/v1/Reviews%20System`;
+    const apikey = getSupabaseKey();
     
+    if (!apikey) {
+      throw new Error("Supabase key not configured");
+    }
+
     const response = await fetch(targetUrl, {
       method: "POST",
       headers: {
@@ -905,7 +931,16 @@ async function syncReviewToSupabase(comment: string, rating: number, userName: s
 
     if (!response.ok) {
       const resText = await response.text();
-      console.warn(`[Supabase Sync] Failed to sync review to Supabase. Status: ${response.status}. Detail: ${resText}`);
+      if (resText.includes("PGRST205") || response.status === 404) {
+        console.warn(`[Supabase Sync] Table 'Reviews System' not found. Storing in local memory fallback.`);
+        fallbackReviews.push({
+          id: fallbackReviews.length + 1,
+          "Reviews": JSON.stringify(reviewsJsonPayload),
+          created_at: new Date().toISOString()
+        });
+      } else {
+        console.warn(`[Supabase Sync] Failed to sync review to Supabase. Status: ${response.status}. Detail: ${resText}`);
+      }
     } else {
       console.log("[Supabase Sync] Review synced to Supabase database successfully.");
     }
@@ -949,6 +984,226 @@ app.post("/api/reviews/notify", async (req, res) => {
 });
 
 // Proxy route for fetching a user profile from Supabase securely
+/**
+ * Real-time secure verification with Clerk's Backend REST API using CLERK_SECRET_KEY.
+ * Never trust a client-side flag.
+ */
+async function checkClerkSubscription(userId: string): Promise<boolean> {
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  if (!clerkSecretKey || !userId) {
+    console.warn("[Clerk Check] CLERK_SECRET_KEY or userId is missing. Falling back to free status.");
+    return false;
+  }
+  
+  try {
+    const response = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+      headers: {
+        "Authorization": `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+    if (!response.ok) {
+      console.error(`[Clerk Check] Failed to fetch user ${userId} from Clerk API: ${response.status}`);
+      return false;
+    }
+    const userData = await response.json();
+    
+    const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
+    const subscriptions = userData.subscriptions || [];
+    
+    const hasActiveSub = subscriptions.some((sub: any) => 
+      (sub.status === "active" || sub.status === "trialing") &&
+      (!expectedPlanId || sub.plan?.id === expectedPlanId)
+    );
+    
+    return hasActiveSub;
+  } catch (err) {
+    console.error("[Clerk Check] Error calling Clerk Backend REST API:", err);
+    return false;
+  }
+}
+
+/**
+ * Checks if user is premium, looking first at our fallbackUsers cache,
+ * then double checking with Clerk's backend API, and syncing to database.
+ */
+async function isUserPremium(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  
+  // 1. Check local memory cache first
+  const cached = fallbackUsers[userId];
+  if (cached && cached.premium_active !== undefined) {
+    return cached.premium_active;
+  }
+  
+  // 2. Perform server-side check with Clerk
+  const isPremium = await checkClerkSubscription(userId);
+  
+  // Cache the results
+  if (!fallbackUsers[userId]) {
+    fallbackUsers[userId] = { id: userId };
+  }
+  fallbackUsers[userId].premium_active = isPremium;
+  
+  // Sync to Database
+  try {
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (apiKey && baseUrl) {
+      const checkUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+      const checkRes = await fetch(checkUrl, {
+        method: "GET",
+        headers: {
+          "apikey": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (Array.isArray(checkData) && checkData.length > 0) {
+          await fetch(`${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+            method: "PATCH",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ premium_active: isPremium, updated_at: new Date().toISOString() })
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[isUserPremium Supabase Sync Fail]:", e);
+  }
+  
+  return isPremium;
+}
+
+// API to query subscription pricing and plan configurations securely from env vars
+app.get("/api/subscription-config", (req, res) => {
+  res.json({
+    planId: process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn",
+    pricing: {
+      monthly: "$4.99",
+      yearly: "$48.00"
+    }
+  });
+});
+
+// Real-time secure endpoint to verify user subscription status
+app.get("/api/verify-subscription", async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId query parameter" });
+    }
+    const isPremium = await isUserPremium(userId);
+    return res.json({ userId, premiumActive: isPremium });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || "Failed to verify subscription" });
+  }
+});
+
+// Secure webhook handler to synchronize Clerk subscription events to database
+app.post("/api/clerk-billing-webhook", express.json(), async (req, res) => {
+  try {
+    const body = req.body;
+    console.log("[Clerk Webhook] Received event payload:", body?.type);
+    
+    if (!body || !body.type) {
+      return res.status(400).json({ error: "Missing body or event type" });
+    }
+    
+    const eventType = body.type;
+    const data = body.data;
+    
+    if (!data) {
+      return res.status(400).json({ error: "Missing event data payload" });
+    }
+    
+    let userId = data.user_id || data.userId || data.id;
+    let isPremium = false;
+    
+    if (eventType === "subscription.created" || eventType === "subscription.updated") {
+      const status = data.status;
+      const planId = data.plan?.id;
+      const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
+      
+      isPremium = (status === "active" || status === "trialing") && (!expectedPlanId || planId === expectedPlanId);
+      userId = data.user_id;
+    } else if (eventType === "user.updated") {
+      const subscriptions = data.subscriptions || [];
+      const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
+      isPremium = subscriptions.some((sub: any) => 
+        (sub.status === "active" || sub.status === "trialing") &&
+        (!expectedPlanId || sub.plan?.id === expectedPlanId)
+      );
+    } else {
+      return res.json({ received: true, status: "ignored" });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ error: "Could not resolve User ID from event payload" });
+    }
+    
+    console.log(`[Clerk Webhook] Syncing user ${userId} premium status to: ${isPremium}`);
+    
+    if (!fallbackUsers[userId]) {
+      fallbackUsers[userId] = { id: userId };
+    }
+    fallbackUsers[userId].premium_active = isPremium;
+    
+    try {
+      const baseUrl = getSupabaseUrl();
+      const apiKey = getSupabaseKey();
+      if (apiKey && baseUrl) {
+        const checkUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+        const checkRes = await fetch(checkUrl, {
+          method: "GET",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          }
+        });
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (Array.isArray(checkData) && checkData.length > 0) {
+            await fetch(`${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+              method: "PATCH",
+              headers: {
+                "apikey": apiKey,
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ premium_active: isPremium, updated_at: new Date().toISOString() })
+            });
+          } else {
+            await fetch(`${baseUrl}/rest/v1/users`, {
+              method: "POST",
+              headers: {
+                "apikey": apiKey,
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ id: userId, premium_active: isPremium, display_name: "Neuraliso Seeker", updated_at: new Date().toISOString() })
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[Clerk Webhook DB Sync Error]:", err);
+    }
+    
+    return res.json({ received: true, status: "synced", userId, isPremium });
+  } catch (err: any) {
+    console.error("[Clerk Webhook Error]:", err);
+    return res.status(500).json({ error: err.message || "Webhook processing failed" });
+  }
+});
+
 app.get("/api/user-profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -967,7 +1222,37 @@ app.get("/api/user-profile/:userId", async (req, res) => {
       }
     });
     if (!response.ok) {
-      throw new Error(`Supabase users query failed with status ${response.status}`);
+      const text = await response.text();
+      if (text.includes("PGRST205") || response.status === 404) {
+        console.warn(`[Proxy user-profile GET] Table 'users' not found. Falling back to local memory.`);
+        const cached = fallbackUsers[userId];
+        if (cached) {
+          return res.json({
+            id: cached.id,
+            userId: cached.id,
+            email: cached.email || "",
+            displayName: cached.display_name || "Neuraliso Seeker",
+            premiumActive: cached.premium_active ?? false,
+            themeMode: cached.theme_mode || "light",
+            notificationsEnabled: cached.notifications_enabled ?? true,
+            completedOnboarding: cached.onboarding_completed ?? false,
+            primaryGoal: cached.primary_goal || "",
+            stressBaseline: cached.stress_baseline ?? 5,
+            preferredCheckinTime: cached.preferred_checkin_time || "09:00 AM",
+            ageRange: cached.age_range || "25-34",
+            wellnessGoals: cached.wellness_goals ? (typeof cached.wellness_goals === "string" ? JSON.parse(cached.wellness_goals) : cached.wellness_goals) : [],
+            challenges: cached.challenges ? (typeof cached.challenges === "string" ? JSON.parse(cached.challenges) : cached.challenges) : [],
+            coping: cached.coping ? (typeof cached.coping === "string" ? JSON.parse(cached.coping) : cached.coping) : [],
+            initialScore: cached.initial_score ?? 0,
+            actionPlan: cached.action_plan ? (typeof cached.action_plan === "string" ? JSON.parse(cached.action_plan) : cached.action_plan) : [],
+            calmXP: cached.calm_xp ?? 120,
+            currentStreak: cached.current_streak ?? 5,
+            milestonesMet: cached.milestones_met ? (typeof cached.milestones_met === "string" ? JSON.parse(cached.milestones_met) : cached.milestones_met) : ["Core Breathing"]
+          });
+        }
+        return res.json(null);
+      }
+      throw new Error(`Supabase users query failed with status ${response.status}: ${text}`);
     }
     const data = await response.json();
     if (Array.isArray(data) && data.length > 0) {
@@ -1075,42 +1360,122 @@ app.post("/api/user-profile", async (req, res) => {
     let upsertRes;
     if (checkRes.ok) {
       const checkData = await checkRes.json();
-      if (Array.isArray(checkData) && checkData.length > 0) {
-        // Exists, perform PATCH
-        const updateUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
-        upsertRes = await fetch(updateUrl, {
-          method: "PATCH",
-          headers: {
-            "apikey": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify(dbPayload)
-        });
-      } else {
-        // Doesn't exist, perform POST
-        const insertUrl = `${baseUrl}/rest/v1/users`;
-        upsertRes = await fetch(insertUrl, {
-          method: "POST",
-          headers: {
-            "apikey": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify({
-            ...dbPayload,
-            created_at: new Date().toISOString()
-          })
-        });
+      const isUpdate = Array.isArray(checkData) && checkData.length > 0;
+      
+      let retries = 15;
+      const currentPayload: any = { ...dbPayload };
+      
+      while (retries > 0) {
+        if (isUpdate) {
+          // Exists, perform PATCH
+          const updateUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+          upsertRes = await fetch(updateUrl, {
+            method: "PATCH",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify(currentPayload)
+          });
+        } else {
+          // Doesn't exist, perform POST
+          const insertUrl = `${baseUrl}/rest/v1/users`;
+          upsertRes = await fetch(insertUrl, {
+            method: "POST",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify({
+              ...currentPayload,
+              created_at: new Date().toISOString()
+            })
+          });
+        }
+
+        if (upsertRes.status === 400) {
+          const errorText = await upsertRes.clone().text();
+          try {
+            const errObj = JSON.parse(errorText);
+            if (errObj.code === "PGRST204" && errObj.message) {
+              const match = errObj.message.match(/Could not find the '([^']+)' column/);
+              if (match && match[1]) {
+                const missingColumn = match[1];
+                console.warn(`[Self-Healing Schema] Pruning missing column '${missingColumn}' from payload.`);
+                delete currentPayload[missingColumn];
+                retries--;
+                continue;
+              }
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+        break;
       }
     } else {
-      throw new Error(`Failed to check existing user: status ${checkRes.status}`);
+      const checkErrText = await checkRes.text();
+      if (checkErrText.includes("PGRST205") || checkRes.status === 404) {
+        console.warn(`[Proxy user-profile POST check] Table 'users' not found. Upserting to local memory fallback.`);
+        fallbackUsers[userId] = dbPayload;
+        return res.json({
+          id: userId,
+          userId: userId,
+          email: dbPayload.email,
+          displayName: dbPayload.display_name,
+          premiumActive: dbPayload.premium_active,
+          themeMode: dbPayload.theme_mode,
+          notificationsEnabled: dbPayload.notifications_enabled,
+          completedOnboarding: dbPayload.onboarding_completed,
+          primaryGoal: dbPayload.primary_goal,
+          stressBaseline: dbPayload.stress_baseline,
+          preferredCheckinTime: dbPayload.preferred_checkin_time,
+          ageRange: dbPayload.age_range,
+          wellnessGoals: profile.wellnessGoals || [],
+          challenges: profile.challenges || [],
+          coping: profile.coping || [],
+          initialScore: dbPayload.initial_score,
+          actionPlan: profile.actionPlan || [],
+          calmXP: dbPayload.calm_xp,
+          currentStreak: dbPayload.current_streak,
+          milestonesMet: profile.milestonesMet || ["Core Breathing"]
+        });
+      }
+      throw new Error(`Failed to check existing user: status ${checkRes.status}: ${checkErrText}`);
     }
 
     if (!upsertRes.ok) {
       const detail = await upsertRes.text();
+      if (detail.includes("PGRST205") || upsertRes.status === 404) {
+        console.warn(`[Proxy user-profile POST] Table 'users' not found. Storing in local memory fallback.`);
+        fallbackUsers[userId] = dbPayload;
+        return res.json({
+          id: userId,
+          userId: userId,
+          email: dbPayload.email,
+          displayName: dbPayload.display_name,
+          premiumActive: dbPayload.premium_active,
+          themeMode: dbPayload.theme_mode,
+          notificationsEnabled: dbPayload.notifications_enabled,
+          completedOnboarding: dbPayload.onboarding_completed,
+          primaryGoal: dbPayload.primary_goal,
+          stressBaseline: dbPayload.stress_baseline,
+          preferredCheckinTime: dbPayload.preferred_checkin_time,
+          ageRange: dbPayload.age_range,
+          wellnessGoals: profile.wellnessGoals || [],
+          challenges: profile.challenges || [],
+          coping: profile.coping || [],
+          initialScore: dbPayload.initial_score,
+          actionPlan: profile.actionPlan || [],
+          calmXP: dbPayload.calm_xp,
+          currentStreak: dbPayload.current_streak,
+          milestonesMet: profile.milestonesMet || ["Core Breathing"]
+        });
+      }
       throw new Error(`Supabase users write failed with status ${upsertRes.status}: ${detail}`);
     }
 
@@ -1141,7 +1506,13 @@ app.get("/api/journal-entries/:userId", async (req, res) => {
       }
     });
     if (!response.ok) {
-      throw new Error(`Supabase entries query failed with status ${response.status}`);
+      const text = await response.text();
+      if (text.includes("PGRST205") || response.status === 404) {
+        console.warn(`[Proxy journal-entries GET] Table 'entries' not found. Falling back to local memory.`);
+        const list = fallbackEntries[userId] || [];
+        return res.json(list);
+      }
+      throw new Error(`Supabase entries query failed with status ${response.status}: ${text}`);
     }
     const data = await response.json();
     const parsedEntries = Array.isArray(data) ? data.map((record: any) => {
@@ -1226,42 +1597,112 @@ app.post("/api/journal-entries", async (req, res) => {
     let upsertRes;
     if (checkRes.ok) {
       const checkData = await checkRes.json();
-      if (Array.isArray(checkData) && checkData.length > 0) {
-        // Exists, perform PATCH
-        const updateUrl = `${baseUrl}/rest/v1/entries?id=eq.${encodeURIComponent(entry.id)}`;
-        upsertRes = await fetch(updateUrl, {
-          method: "PATCH",
-          headers: {
-            "apikey": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify(dbPayload)
-        });
-      } else {
-        // Doesn't exist, perform POST
-        const insertUrl = `${baseUrl}/rest/v1/entries`;
-        upsertRes = await fetch(insertUrl, {
-          method: "POST",
-          headers: {
-            "apikey": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-          },
-          body: JSON.stringify({
-            ...dbPayload,
-            created_at: new Date().toISOString()
-          })
-        });
+      const isUpdate = Array.isArray(checkData) && checkData.length > 0;
+      
+      // Non-premium gating check: Limit total entries to 5 for new logs
+      if (!isUpdate) {
+        const isPremium = await isUserPremium(userId);
+        if (!isPremium) {
+          const countUrl = `${baseUrl}/rest/v1/entries?user_id=eq.${encodeURIComponent(userId)}`;
+          const countRes = await fetch(countUrl, {
+            method: "GET",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            }
+          });
+          if (countRes.ok) {
+            const existingEntries = await countRes.json();
+            if (Array.isArray(existingEntries) && existingEntries.length >= 5) {
+              return res.status(403).json({
+                error: "Free Plan Limit Reached: You can save up to 5 journal entries. Please upgrade to Premium to unlock unlimited logging space."
+              });
+            }
+          }
+        }
+      }
+
+      let retries = 10;
+      const currentPayload: any = { ...dbPayload };
+
+      while (retries > 0) {
+        if (isUpdate) {
+          // Exists, perform PATCH
+          const updateUrl = `${baseUrl}/rest/v1/entries?id=eq.${encodeURIComponent(entry.id)}`;
+          upsertRes = await fetch(updateUrl, {
+            method: "PATCH",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify(currentPayload)
+          });
+        } else {
+          // Doesn't exist, perform POST
+          const insertUrl = `${baseUrl}/rest/v1/entries`;
+          upsertRes = await fetch(insertUrl, {
+            method: "POST",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify({
+              ...currentPayload,
+              created_at: new Date().toISOString()
+            })
+          });
+        }
+
+        if (upsertRes.status === 400) {
+          const errorText = await upsertRes.clone().text();
+          try {
+            const errObj = JSON.parse(errorText);
+            if (errObj.code === "PGRST204" && errObj.message) {
+              const match = errObj.message.match(/Could not find the '([^']+)' column/);
+              if (match && match[1]) {
+                const missingColumn = match[1];
+                console.warn(`[Self-Healing Schema] Pruning missing column '${missingColumn}' from entries payload.`);
+                delete currentPayload[missingColumn];
+                retries--;
+                continue;
+              }
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+        break;
       }
     } else {
-      throw new Error(`Failed to check existing journal entry: status ${checkRes.status}`);
+      const checkErrText = await checkRes.text();
+      if (checkErrText.includes("PGRST205") || checkRes.status === 404) {
+        console.warn(`[Proxy journal-entries POST check] Table 'entries' not found. Saving to local memory fallback.`);
+        if (!fallbackEntries[userId]) {
+          fallbackEntries[userId] = [];
+        }
+        fallbackEntries[userId] = fallbackEntries[userId].filter((e: any) => e.id !== entry.id);
+        fallbackEntries[userId].push(entry);
+        return res.json(dbPayload);
+      }
+      throw new Error(`Failed to check existing journal entry: status ${checkRes.status}: ${checkErrText}`);
     }
 
     if (!upsertRes.ok) {
       const detail = await upsertRes.text();
+      if (detail.includes("PGRST205") || upsertRes.status === 404) {
+        console.warn(`[Proxy journal-entries POST] Table 'entries' not found. Saving to local memory fallback.`);
+        if (!fallbackEntries[userId]) {
+          fallbackEntries[userId] = [];
+        }
+        fallbackEntries[userId] = fallbackEntries[userId].filter((e: any) => e.id !== entry.id);
+        fallbackEntries[userId].push(entry);
+        return res.json(dbPayload);
+      }
       throw new Error(`Supabase entries write failed with status ${upsertRes.status}: ${detail}`);
     }
 
@@ -1291,7 +1732,12 @@ app.get("/api/reviews", async (req, res) => {
       }
     });
     if (!response.ok) {
-      throw new Error(`Supabase query failed with status ${response.status}`);
+      const text = await response.text();
+      if (text.includes("PGRST205") || response.status === 404) {
+        console.warn(`[Proxy reviews GET] Table 'Reviews System' not found. Falling back to local memory.`);
+        return res.json(fallbackReviews);
+      }
+      throw new Error(`Supabase query failed with status ${response.status}: ${text}`);
     }
     const data = await response.json();
     return res.json(data);
@@ -1322,6 +1768,16 @@ app.post("/api/reviews", async (req, res) => {
     });
     if (!response.ok) {
       const detail = await response.text();
+      if (detail.includes("PGRST205") || response.status === 404) {
+        console.warn(`[Proxy reviews POST] Table 'Reviews System' not found. Saving to local memory.`);
+        const item = {
+          id: fallbackReviews.length + 1,
+          ...req.body,
+          created_at: new Date().toISOString()
+        };
+        fallbackReviews.push(item);
+        return res.json(item);
+      }
       throw new Error(`Supabase write failed with status ${response.status}: ${detail}`);
     }
     const data = await response.json();

@@ -191,7 +191,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({ isOpen, onClose, onU
           {/* Footer CTA */}
           <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-center justify-between">
             <span className="text-[10px] text-slate-400 font-mono italic">
-              *Billed securely via Clerk Billing Integration. Cancel anytime.
+              *Billed securely via Secure Sandbox Integration. Cancel anytime.
             </span>
             <div className="flex gap-2.5 w-full sm:w-auto">
               <button

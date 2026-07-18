@@ -985,47 +985,8 @@ app.post("/api/reviews/notify", async (req, res) => {
 
 // Proxy route for fetching a user profile from Supabase securely
 /**
- * Real-time secure verification with Clerk's Backend REST API using CLERK_SECRET_KEY.
- * Never trust a client-side flag.
- */
-async function checkClerkSubscription(userId: string): Promise<boolean> {
-  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-  if (!clerkSecretKey || !userId) {
-    console.warn("[Clerk Check] CLERK_SECRET_KEY or userId is missing. Falling back to free status.");
-    return false;
-  }
-  
-  try {
-    const response = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-      headers: {
-        "Authorization": `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json"
-      }
-    });
-    if (!response.ok) {
-      console.error(`[Clerk Check] Failed to fetch user ${userId} from Clerk API: ${response.status}`);
-      return false;
-    }
-    const userData = await response.json();
-    
-    const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
-    const subscriptions = userData.subscriptions || [];
-    
-    const hasActiveSub = subscriptions.some((sub: any) => 
-      (sub.status === "active" || sub.status === "trialing") &&
-      (!expectedPlanId || sub.plan?.id === expectedPlanId)
-    );
-    
-    return hasActiveSub;
-  } catch (err) {
-    console.error("[Clerk Check] Error calling Clerk Backend REST API:", err);
-    return false;
-  }
-}
-
-/**
  * Checks if user is premium, looking first at our fallbackUsers cache,
- * then double checking with Clerk's backend API, and syncing to database.
+ * then double checking with Supabase DB.
  */
 async function isUserPremium(userId: string): Promise<boolean> {
   if (!userId) return false;
@@ -1036,16 +997,7 @@ async function isUserPremium(userId: string): Promise<boolean> {
     return cached.premium_active;
   }
   
-  // 2. Perform server-side check with Clerk
-  const isPremium = await checkClerkSubscription(userId);
-  
-  // Cache the results
-  if (!fallbackUsers[userId]) {
-    fallbackUsers[userId] = { id: userId };
-  }
-  fallbackUsers[userId].premium_active = isPremium;
-  
-  // Sync to Database
+  // 2. Perform server-side check with Supabase database directly
   try {
     const baseUrl = getSupabaseUrl();
     const apiKey = getSupabaseKey();
@@ -1062,15 +1014,13 @@ async function isUserPremium(userId: string): Promise<boolean> {
       if (checkRes.ok) {
         const checkData = await checkRes.json();
         if (Array.isArray(checkData) && checkData.length > 0) {
-          await fetch(`${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
-            method: "PATCH",
-            headers: {
-              "apikey": apiKey,
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ premium_active: isPremium, updated_at: new Date().toISOString() })
-          });
+          const isPremium = checkData[0].premium_active ?? false;
+          
+          if (!fallbackUsers[userId]) {
+            fallbackUsers[userId] = { id: userId };
+          }
+          fallbackUsers[userId].premium_active = isPremium;
+          return isPremium;
         }
       }
     }
@@ -1078,13 +1028,12 @@ async function isUserPremium(userId: string): Promise<boolean> {
     console.warn("[isUserPremium Supabase Sync Fail]:", e);
   }
   
-  return isPremium;
+  return false;
 }
 
 // API to query subscription pricing and plan configurations securely from env vars
 app.get("/api/subscription-config", (req, res) => {
   res.json({
-    planId: process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn",
     pricing: {
       monthly: "$4.99",
       yearly: "$48.00"
@@ -1106,102 +1055,9 @@ app.get("/api/verify-subscription", async (req, res) => {
   }
 });
 
-// Secure webhook handler to synchronize Clerk subscription events to database
+// Backward-compatible no-op endpoint for clerk webhooks
 app.post("/api/clerk-billing-webhook", express.json(), async (req, res) => {
-  try {
-    const body = req.body;
-    console.log("[Clerk Webhook] Received event payload:", body?.type);
-    
-    if (!body || !body.type) {
-      return res.status(400).json({ error: "Missing body or event type" });
-    }
-    
-    const eventType = body.type;
-    const data = body.data;
-    
-    if (!data) {
-      return res.status(400).json({ error: "Missing event data payload" });
-    }
-    
-    let userId = data.user_id || data.userId || data.id;
-    let isPremium = false;
-    
-    if (eventType === "subscription.created" || eventType === "subscription.updated") {
-      const status = data.status;
-      const planId = data.plan?.id;
-      const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
-      
-      isPremium = (status === "active" || status === "trialing") && (!expectedPlanId || planId === expectedPlanId);
-      userId = data.user_id;
-    } else if (eventType === "user.updated") {
-      const subscriptions = data.subscriptions || [];
-      const expectedPlanId = process.env.CLERK_PLAN_ID || "cplan_3GetfT7gBE9Ek44SIVvqGz2yxAn";
-      isPremium = subscriptions.some((sub: any) => 
-        (sub.status === "active" || sub.status === "trialing") &&
-        (!expectedPlanId || sub.plan?.id === expectedPlanId)
-      );
-    } else {
-      return res.json({ received: true, status: "ignored" });
-    }
-    
-    if (!userId) {
-      return res.status(400).json({ error: "Could not resolve User ID from event payload" });
-    }
-    
-    console.log(`[Clerk Webhook] Syncing user ${userId} premium status to: ${isPremium}`);
-    
-    if (!fallbackUsers[userId]) {
-      fallbackUsers[userId] = { id: userId };
-    }
-    fallbackUsers[userId].premium_active = isPremium;
-    
-    try {
-      const baseUrl = getSupabaseUrl();
-      const apiKey = getSupabaseKey();
-      if (apiKey && baseUrl) {
-        const checkUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
-        const checkRes = await fetch(checkUrl, {
-          method: "GET",
-          headers: {
-            "apikey": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          }
-        });
-        if (checkRes.ok) {
-          const checkData = await checkRes.json();
-          if (Array.isArray(checkData) && checkData.length > 0) {
-            await fetch(`${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
-              method: "PATCH",
-              headers: {
-                "apikey": apiKey,
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({ premium_active: isPremium, updated_at: new Date().toISOString() })
-            });
-          } else {
-            await fetch(`${baseUrl}/rest/v1/users`, {
-              method: "POST",
-              headers: {
-                "apikey": apiKey,
-                "Authorization": `Bearer ${apiKey}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({ id: userId, premium_active: isPremium, display_name: "Neuraliso Seeker", updated_at: new Date().toISOString() })
-            });
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("[Clerk Webhook DB Sync Error]:", err);
-    }
-    
-    return res.json({ received: true, status: "synced", userId, isPremium });
-  } catch (err: any) {
-    console.error("[Clerk Webhook Error]:", err);
-    return res.status(500).json({ error: err.message || "Webhook processing failed" });
-  }
+  return res.json({ received: true, status: "ignored" });
 });
 
 app.get("/api/user-profile/:userId", async (req, res) => {

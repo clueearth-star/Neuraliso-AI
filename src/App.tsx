@@ -45,7 +45,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
-import { ClerkProvider, useUser, useClerk } from "@clerk/clerk-react";
+import { supabase } from "./lib/supabase";
 
 interface AppContentProps {
   user: {
@@ -790,112 +790,78 @@ function AppContent({
   );
 }
 
-// Check if Clerk is configured
-let clerkPublishableKey = (import.meta as any).env?.VITE_CLERK_PUBLISHABLE_KEY;
+function AppWithSupabase() {
+  const [sUser, setSUser] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
 
-// Robust check: Clerk publishable key must start with 'pk_'. If it starts with 'sk_', it's a secret key, not a publishable key!
-if (clerkPublishableKey && clerkPublishableKey.startsWith("sk_")) {
-  console.warn("Warning: VITE_CLERK_PUBLISHABLE_KEY is configured with a secret key starting with 'sk_'. Falling back to the valid test publishable key.");
-  clerkPublishableKey = "pk_test_YWRlcXVhdGUtaG91bmQtODkuY2xlcmsuYWNjb3VudHMuZGV2JA";
-} else if (!clerkPublishableKey) {
-  // If not provided, fallback to the default test publishable key since the user explicitly wants Clerk.
-  clerkPublishableKey = "pk_test_YWRlcXVhdGUtaG91bmQtODkuY2xlcmsuYWNjb3VudHMuZGV2JA";
-}
+  useEffect(() => {
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSUser(session?.user || null);
+      setLoadingAuth(false);
+    });
 
-const isClerkConfigured = !!clerkPublishableKey && clerkPublishableKey.startsWith("pk_");
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSUser(session?.user || null);
+      setLoadingAuth(false);
+    });
 
-function AppWithClerk() {
-  const { user: cUser, isLoaded } = useUser();
-  const { signOut, openSignIn, openSignUp } = useClerk();
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
-  const user = cUser ? {
-    id: cUser.id,
-    uid: cUser.id,
-    displayName: cUser.fullName || cUser.username || "Neuraliso Seeker",
-    email: cUser.primaryEmailAddress?.emailAddress || "",
-    createdAt: cUser.createdAt
+  const user = sUser ? {
+    id: sUser.id,
+    uid: sUser.id,
+    displayName: sUser.user_metadata?.display_name || sUser.user_metadata?.full_name || sUser.email?.split("@")[0] || "Neuraliso Seeker",
+    email: sUser.email || "",
+    createdAt: sUser.created_at ? new Date(sUser.created_at) : undefined
   } : null;
 
   const handleLoginWithGoogle = async () => {
-    return openSignIn();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) throw error;
+    return data;
   };
 
-  const handleLoginWithEmail = async () => {
-    return openSignIn();
+  const handleLoginWithEmail = async (email: string, pass: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pass,
+    });
+    if (error) throw error;
+    return data.user;
   };
 
-  const handleRegisterWithEmail = async () => {
-    return openSignUp();
+  const handleRegisterWithEmail = async (email: string, pass: string, name: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: {
+          display_name: name,
+        }
+      }
+    });
+    if (error) throw error;
+    return data.user;
   };
 
   const handleLogout = async () => {
-    return await signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
   const handleLoginAnonymously = async () => {
     localStorage.setItem("neuraliso_offline_sandbox", "true");
     window.location.reload();
-  };
-
-  return (
-    <AppContent
-      user={user}
-      loadingAuth={!isLoaded}
-      loginWithGoogle={handleLoginWithGoogle}
-      logoutUser={handleLogout}
-      registerWithEmail={handleRegisterWithEmail}
-      loginWithEmail={handleLoginWithEmail}
-      loginAnonymously={handleLoginAnonymously}
-      isAuth0Active={true}
-    />
-  );
-}
-
-function AppWithFirebase() {
-  const [user, setUser] = useState<{
-    id: string;
-    uid: string;
-    displayName: string;
-    email: string;
-    createdAt?: Date;
-  } | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (fUser) => {
-      if (fUser) {
-        setUser({
-          id: fUser.uid,
-          uid: fUser.uid,
-          displayName: fUser.displayName || "Neuraliso Seeker",
-          email: fUser.email || ""
-        });
-      } else {
-        setUser(null);
-      }
-      setLoadingAuth(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLoginWithGoogle = async () => {
-    return await firebaseLoginWithGoogle();
-  };
-
-  const handleLoginWithEmail = async (email: string, pass: string) => {
-    return await firebaseLoginWithEmail(email, pass);
-  };
-
-  const handleRegisterWithEmail = async (email: string, pass: string, name: string) => {
-    return await firebaseRegisterWithEmail(email, pass, name);
-  };
-
-  const handleLogout = async () => {
-    return await firebaseLogoutUser();
-  };
-
-  const handleLoginAnonymously = async () => {
-    return await firebaseLoginAnonymously();
   };
 
   return (
@@ -907,19 +873,11 @@ function AppWithFirebase() {
       registerWithEmail={handleRegisterWithEmail}
       loginWithEmail={handleLoginWithEmail}
       loginAnonymously={handleLoginAnonymously}
-      isAuth0Active={false}
+      isAuth0Active={true}
     />
   );
 }
 
 export default function App() {
-  if (isClerkConfigured) {
-    return (
-      <ClerkProvider publishableKey={clerkPublishableKey}>
-        <AppWithClerk />
-      </ClerkProvider>
-    );
-  } else {
-    return <AppWithFirebase />;
-  }
+  return <AppWithSupabase />;
 }

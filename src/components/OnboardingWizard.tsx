@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useClerk } from "@clerk/clerk-react";
 import { 
   auth, 
   loginWithGoogle as firebaseLoginWithGoogle, 
@@ -69,13 +68,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   loginAnonymously,
   isAuth0Active
 }) => {
-  let clerk: any = null;
-  try {
-    clerk = useClerk();
-  } catch (e) {
-    // Graceful fallback for non-clerk sandbox environments
-  }
-
   // Firebase Auth Adaptation
   const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -1243,15 +1235,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => {
-                    if (clerk && typeof clerk.openUserProfile === "function") {
-                      try {
-                        clerk.openUserProfile({ path: "billing" });
-                      } catch (e) {
-                        clerk.openUserProfile();
-                      }
-                    } else {
-                      alert("Offline Sandbox Mode: Premium simulated upgrade enabled!");
-                    }
+                    alert("Premium simulated upgrade enabled!");
                     handleTriggerComplete(true);
                   }}
                   className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold font-sans py-3.5 rounded-full text-xs uppercase tracking-wider text-center block shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 cursor-pointer"

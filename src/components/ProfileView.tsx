@@ -3,7 +3,6 @@ import { JournalEntry } from "../types";
 import { PremiumBlueprintView } from "./PremiumBlueprintView";
 import { SystemDiagnostics } from "./SystemDiagnostics";
 import { Settings, Save, X, Edit3, Check, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
-import { useClerk } from "@clerk/clerk-react";
 import { PricingModal } from "./PricingModal";
 
 interface ProfileViewProps {
@@ -39,14 +38,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   // Determine if utilizing actual database or sandbox defaults
   const isAuthEnabled = !!user;
-
-  // Clerk hook for billing portal redirection
-  let clerk: any = null;
-  try {
-    clerk = useClerk();
-  } catch (e) {
-    // Graceful fallback for non-clerk sandbox runtimes
-  }
 
   // Local state fallbacks if guest/sandbox
   const [localPremium, setLocalPremium] = useState(false);
@@ -107,39 +98,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const handleExecuteUpgrade = () => {
-    if (clerk && typeof clerk.openUserProfile === "function") {
-      try {
-        clerk.openUserProfile({ path: "billing" });
-        setIsPricingOpen(false);
-      } catch (e) {
-        console.warn("[Clerk billing profile route fallback]", e);
-        clerk.openUserProfile();
-      }
+    // Offline sandbox toggle fallback for preview purposes
+    if (onUpdateProfile) {
+      onUpdateProfile({ premiumActive: !premiumActive });
     } else {
-      // Offline sandbox toggle fallback for preview purposes
-      if (onUpdateProfile) {
-        onUpdateProfile({ premiumActive: !premiumActive });
-      } else {
-        setLocalPremium((p) => !p);
-      }
-      setIsPricingOpen(false);
+      setLocalPremium((p) => !p);
     }
+    setIsPricingOpen(false);
   };
 
-  const handleManageClerkBilling = () => {
-    if (clerk && typeof clerk.openUserProfile === "function") {
-      try {
-        clerk.openUserProfile({ path: "billing" });
-      } catch (e) {
-        clerk.openUserProfile();
-      }
+  const handleManageSubscription = () => {
+    // Local fallback toggle
+    if (onUpdateProfile) {
+      onUpdateProfile({ premiumActive: !premiumActive });
     } else {
-      // Local fallback toggle
-      if (onUpdateProfile) {
-        onUpdateProfile({ premiumActive: !premiumActive });
-      } else {
-        setLocalPremium((p) => !p);
-      }
+      setLocalPremium((p) => !p);
     }
   };
 
@@ -330,7 +303,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* Upgrade Call to action */}
         <button
           id="toggle-premium-membership"
-          onClick={premiumActive ? handleManageClerkBilling : togglePremium}
+          onClick={premiumActive ? handleManageSubscription : togglePremium}
           className="w-full bg-deep-sage text-white text-xs font-bold py-3 px-5 rounded-full shadow-lg shadow-deep-sage/15 hover:bg-primary-sage transition-all active:scale-95 flex items-center justify-between cursor-pointer"
         >
           <span>{premiumActive ? "Manage Premium Subscription" : "Activate Premium Upgrade ($4.99/mo)"}</span>
@@ -615,7 +588,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </span>
           </div>
           <button
-            onClick={premiumActive ? handleManageClerkBilling : () => setIsPricingOpen(true)}
+            onClick={premiumActive ? handleManageSubscription : () => setIsPricingOpen(true)}
             className="text-[10px] text-deep-sage hover:text-primary-sage underline font-semibold flex items-center gap-1 cursor-pointer font-mono uppercase tracking-wide"
           >
             <CreditCard className="w-3.5 h-3.5 text-deep-sage" />

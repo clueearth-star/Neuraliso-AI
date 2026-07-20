@@ -1199,19 +1199,139 @@ app.post("/api/reviews/notify", async (req, res) => {
 
 // Proxy route for fetching a user profile from Supabase securely
 /**
- * Checks if user is premium, looking first at our fallbackUsers cache,
- * then double checking with Supabase DB.
+ * Helper to update user subscription details securely both in-memory and in Supabase
  */
-async function isUserPremium(userId: string): Promise<boolean> {
-  if (!userId) return false;
-  
-  // 1. Check local memory cache first
-  const cached = fallbackUsers[userId];
-  if (cached && cached.premium_active !== undefined) {
-    return cached.premium_active;
+async function updateUserSubscription(userId: string, data: {
+  premium_active: boolean;
+  trial_start_date: string;
+  trial_end_date: string;
+  dodo_subscription_id: string;
+  dodo_payment_status: string;
+}) {
+  if (!fallbackUsers[userId]) {
+    fallbackUsers[userId] = { id: userId };
   }
   
-  // 2. Perform server-side check with Supabase database directly
+  fallbackUsers[userId].premium_active = data.premium_active;
+  fallbackUsers[userId].trial_start_date = data.trial_start_date;
+  fallbackUsers[userId].trial_end_date = data.trial_end_date;
+  fallbackUsers[userId].dodo_subscription_id = data.dodo_subscription_id;
+  fallbackUsers[userId].dodo_payment_status = data.dodo_payment_status;
+
+  try {
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (baseUrl && apiKey) {
+      let retries = 5;
+      const currentPayload: any = {
+        premium_active: data.premium_active,
+        trial_start_date: data.trial_start_date,
+        trial_end_date: data.trial_end_date,
+        dodo_subscription_id: data.dodo_subscription_id,
+        dodo_payment_status: data.dodo_payment_status
+      };
+      
+      while (retries > 0) {
+        const updateUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+        const res = await fetch(updateUrl, {
+          method: "PATCH",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify(currentPayload)
+        });
+
+        if (res.status === 400) {
+          const errorText = await res.text();
+          if (errorText.includes("PGRST204")) {
+            const match = errorText.match(/Could not find the '([^']+)' column/);
+            if (match && match[1]) {
+              const missingColumn = match[1];
+              console.warn(`[Dodo Self-Healing] Pruning column '${missingColumn}' from PATCH payload.`);
+              delete currentPayload[missingColumn];
+              retries--;
+              continue;
+            }
+          }
+        }
+        break;
+      }
+    }
+  } catch (e) {
+    console.warn("[updateUserSubscription Supabase patch fail]:", e);
+  }
+}
+
+/**
+ * Find user id by email address from cache or database
+ */
+async function findUserIdByEmail(email: string): Promise<string | null> {
+  if (!email) return null;
+  const emailLower = email.toLowerCase().trim();
+
+  // Check cache
+  for (const uid in fallbackUsers) {
+    if (fallbackUsers[uid].email && fallbackUsers[uid].email.toLowerCase().trim() === emailLower) {
+      return uid;
+    }
+  }
+
+  // Query Supabase
+  try {
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (baseUrl && apiKey) {
+      const checkUrl = `${baseUrl}/rest/v1/users?email=eq.${encodeURIComponent(emailLower)}`;
+      const checkRes = await fetch(checkUrl, {
+        method: "GET",
+        headers: {
+          "apikey": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (Array.isArray(checkData) && checkData.length > 0) {
+          return checkData[0].id;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[findUserIdByEmail Supabase Fail]:", e);
+  }
+
+  return null;
+}
+
+/**
+ * Checks detailed subscription, trial, and email exception state for a user securely server-side.
+ */
+async function getUserSubscriptionState(userId: string): Promise<{ premiumActive: boolean; trialDaysLeft: number | null; isTrial: boolean; reason?: string }> {
+  if (!userId) return { premiumActive: false, trialDaysLeft: null, isTrial: false };
+
+  let email = "";
+  let premiumActive = false;
+  let trialStartDate: string | null = null;
+  let trialEndDate: string | null = null;
+  let dodoSubscriptionId = "";
+  let dodoPaymentStatus = "";
+
+  // 1. Check local cache
+  const cached = fallbackUsers[userId];
+  if (cached) {
+    email = cached.email || "";
+    premiumActive = cached.premium_active ?? false;
+    trialStartDate = cached.trial_start_date || null;
+    trialEndDate = cached.trial_end_date || null;
+    dodoSubscriptionId = cached.dodo_subscription_id || "";
+    dodoPaymentStatus = cached.dodo_payment_status || "";
+  }
+
+  // 2. Fetch from Supabase
   try {
     const baseUrl = getSupabaseUrl();
     const apiKey = getSupabaseKey();
@@ -1228,21 +1348,68 @@ async function isUserPremium(userId: string): Promise<boolean> {
       if (checkRes.ok) {
         const checkData = await checkRes.json();
         if (Array.isArray(checkData) && checkData.length > 0) {
-          const isPremium = checkData[0].premium_active ?? false;
-          
+          const record = checkData[0];
+          email = record.email || email;
+          premiumActive = record.premium_active ?? premiumActive;
+          trialStartDate = record.trial_start_date || trialStartDate;
+          trialEndDate = record.trial_end_date || trialEndDate;
+          dodoSubscriptionId = record.dodo_subscription_id || dodoSubscriptionId;
+          dodoPaymentStatus = record.dodo_payment_status || dodoPaymentStatus;
+
           if (!fallbackUsers[userId]) {
             fallbackUsers[userId] = { id: userId };
           }
-          fallbackUsers[userId].premium_active = isPremium;
-          return isPremium;
+          fallbackUsers[userId].email = email;
+          fallbackUsers[userId].premium_active = premiumActive;
+          fallbackUsers[userId].trial_start_date = trialStartDate;
+          fallbackUsers[userId].trial_end_date = trialEndDate;
+          fallbackUsers[userId].dodo_subscription_id = dodoSubscriptionId;
+          fallbackUsers[userId].dodo_payment_status = dodoPaymentStatus;
         }
       }
     }
   } catch (e) {
-    console.warn("[isUserPremium Supabase Sync Fail]:", e);
+    console.warn("[getUserSubscriptionState Supabase Fail]:", e);
   }
-  
-  return false;
+
+  // 3. Exception for clueearth@gmail.com
+  if (email && email.toLowerCase().trim() === "clueearth@gmail.com") {
+    return { premiumActive: true, trialDaysLeft: null, isTrial: false };
+  }
+
+  // 4. Check payment connection
+  if (!premiumActive) {
+    return { premiumActive: false, trialDaysLeft: null, isTrial: false, reason: "payment_not_connected" };
+  }
+
+  // 5. Evaluate trial timeline
+  if (trialStartDate && trialEndDate) {
+    const now = new Date();
+    const end = new Date(trialEndDate);
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 0) {
+      return { premiumActive: true, trialDaysLeft: diffDays, isTrial: true };
+    } else {
+      if (dodoPaymentStatus === "active" || dodoPaymentStatus === "succeeded" || dodoPaymentStatus === "completed" || !dodoPaymentStatus) {
+        return { premiumActive: true, trialDaysLeft: 0, isTrial: false };
+      } else {
+        return { premiumActive: false, trialDaysLeft: 0, isTrial: false, reason: "trial_expired_payment_failed" };
+      }
+    }
+  }
+
+  return { premiumActive: true, trialDaysLeft: null, isTrial: false };
+}
+
+/**
+ * Checks if user is premium, looking first at our fallbackUsers cache,
+ * then double checking with Supabase DB.
+ */
+async function isUserPremium(userId: string): Promise<boolean> {
+  const state = await getUserSubscriptionState(userId);
+  return state.premiumActive;
 }
 
 // API to query subscription pricing and plan configurations securely from env vars
@@ -1262,10 +1429,134 @@ app.get("/api/verify-subscription", async (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: "Missing userId query parameter" });
     }
-    const isPremium = await isUserPremium(userId);
-    return res.json({ userId, premiumActive: isPremium });
+    const state = await getUserSubscriptionState(userId);
+    return res.json({ 
+      userId, 
+      premiumActive: state.premiumActive,
+      trialDaysLeft: state.trialDaysLeft,
+      isTrial: state.isTrial,
+      reason: state.reason
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to verify subscription" });
+  }
+});
+
+// Endpoint to verify payment method connection / subscription activation on redirect
+app.post("/api/verify-dodo-payment", express.json(), async (req, res) => {
+  try {
+    const { userId, subscriptionId } = req.body;
+    if (!userId || !subscriptionId) {
+      return res.status(400).json({ error: "Missing userId or subscriptionId in payload" });
+    }
+
+    const apiKey = process.env.DODO_PAYMENTS_API_KEY;
+    if (!apiKey) {
+      console.warn("[Verify Dodo Payment] DODO_PAYMENTS_API_KEY is not configured. Simulating verification in testing sandbox.");
+      const trialStart = new Date();
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 3);
+
+      await updateUserSubscription(userId, {
+        premium_active: true,
+        trial_start_date: trialStart.toISOString(),
+        trial_end_date: trialEnd.toISOString(),
+        dodo_subscription_id: subscriptionId,
+        dodo_payment_status: "active"
+      });
+
+      return res.json({ success: true, message: "Sandbox simulated checkout succeeded" });
+    }
+
+    const dodoUrl = `https://api.dodopayments.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`;
+    const response = await fetch(dodoUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).json({ error: `Dodo API error: ${text}` });
+    }
+
+    const data = await response.json();
+    const status = data.status; // e.g., "active", "cancelled", etc.
+    const customerEmail = data.customer?.email || data.email;
+
+    console.log(`[Verify Dodo Payment] Dodo API subscription status: ${status}, email: ${customerEmail}`);
+
+    const isSuccess = status === "active" || status === "succeeded" || status === "completed";
+
+    if (isSuccess) {
+      const trialStart = new Date();
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 3);
+
+      await updateUserSubscription(userId, {
+        premium_active: true,
+        trial_start_date: trialStart.toISOString(),
+        trial_end_date: trialEnd.toISOString(),
+        dodo_subscription_id: subscriptionId,
+        dodo_payment_status: status
+      });
+
+      return res.json({ success: true });
+    } else {
+      return res.status(400).json({ error: `Subscription is not active. Current status: ${status}` });
+    }
+  } catch (err: any) {
+    console.error("[Verify Dodo Payment Error]:", err);
+    return res.status(500).json({ error: err.message || "Failed to verify payment connection" });
+  }
+});
+
+// Endpoint for receiving webhooks from Dodo Payments
+app.post("/api/webhooks/dodo", express.json(), async (req, res) => {
+  try {
+    const payload = req.body;
+    console.log("[Dodo Webhook] Received webhook payload:", JSON.stringify(payload));
+
+    const eventType = payload?.event;
+    const data = payload?.data;
+
+    if (data) {
+      const customerEmail = data.customer?.email || data.email;
+      const userId = data.metadata?.userId || data.client_reference_id;
+      const subscriptionId = data.subscription_id || data.id;
+      const status = data.status;
+
+      if (eventType === "subscription.created" || eventType === "subscription.activated" || eventType === "subscription.updated" || eventType === "order.completed" || eventType === "payment.succeeded") {
+        let targetUserId = userId;
+        if (!targetUserId && customerEmail) {
+          targetUserId = await findUserIdByEmail(customerEmail);
+        }
+
+        if (targetUserId) {
+          console.log(`[Dodo Webhook] Processing event '${eventType}' for user ${targetUserId}. Status: ${status}`);
+          const trialStart = new Date();
+          const trialEnd = new Date();
+          trialEnd.setDate(trialEnd.getDate() + 3);
+
+          await updateUserSubscription(targetUserId, {
+            premium_active: status === "active" || status === "succeeded" || status === "completed" || eventType === "payment.succeeded",
+            trial_start_date: trialStart.toISOString(),
+            trial_end_date: trialEnd.toISOString(),
+            dodo_subscription_id: subscriptionId || "",
+            dodo_payment_status: status || "active"
+          });
+        } else {
+          console.warn("[Dodo Webhook] No matching user found in database or cache for customer email / userId:", customerEmail, userId);
+        }
+      }
+    }
+
+    return res.json({ received: true });
+  } catch (err: any) {
+    console.error("[Dodo Webhook Process Error]:", err);
+    return res.status(500).json({ error: err.message || "Webhook processing failed" });
   }
 });
 

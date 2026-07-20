@@ -13,6 +13,7 @@ import { SOSIcon } from "./components/Icons";
 
 // Onboarding & Enterprise Additions
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { DodoPaywallView } from "./components/DodoPaywallView";
 import { EnterprisePortal } from "./components/EnterprisePortal";
 import { ReviewsView } from "./components/ReviewsView";
 import { NeuroplasmWorkshopView } from "./components/NeuroplasmWorkshopView";
@@ -87,6 +88,9 @@ function AppContent({
     userId: string;
     displayName: string;
     premiumActive: boolean;
+    trialDaysLeft?: number | null;
+    isTrial?: boolean;
+    subscriptionReason?: string;
     themeMode: "light" | "neutral";
     notificationsEnabled: boolean;
     completedOnboarding?: boolean;
@@ -101,6 +105,8 @@ function AppContent({
     milestonesMet?: string[];
     preferredCheckinTime?: string;
   } | null>(null);
+
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
 
   // Fallback state if user continues offline
   const [isOfflineSandbox, setIsOfflineSandbox] = useState<boolean>(false);
@@ -177,6 +183,7 @@ function AppContent({
 
     if (user) {
       setIsOfflineSandbox(false);
+      setLoadingProfile(true);
       
       const syncProfileAndData = async () => {
         try {
@@ -190,11 +197,17 @@ function AppContent({
           if (data) {
             // Real-time server-side verified subscription status check (never trust client flags)
             let verifiedPremium = data.premiumActive ?? false;
+            let trialDaysLeft = null;
+            let isTrial = false;
+            let subscriptionReason = undefined;
             try {
               const subRes = await fetch(`/api/verify-subscription?userId=${user.id}`);
               if (subRes.ok) {
                 const subData = await subRes.json();
                 verifiedPremium = subData.premiumActive;
+                trialDaysLeft = subData.trialDaysLeft;
+                isTrial = subData.isTrial;
+                subscriptionReason = subData.reason;
               }
             } catch (subErr) {
               console.warn("[Subscription verification fallback error]:", subErr);
@@ -205,6 +218,9 @@ function AppContent({
               userId: data.userId || user.id,
               displayName: data.displayName || user.displayName || "Neuraliso Seeker",
               premiumActive: verifiedPremium,
+              trialDaysLeft,
+              isTrial,
+              subscriptionReason,
               themeMode: data.themeMode || "light",
               notificationsEnabled: data.notificationsEnabled ?? true,
               completedOnboarding: hasCompletedOnboarding,
@@ -231,6 +247,7 @@ function AppContent({
             const initialProfile = {
               userId: user.id,
               displayName: user.displayName || "Neuraliso Seeker",
+              email: user.email || "",
               premiumActive: false,
               themeMode: "light" as const,
               notificationsEnabled: true,
@@ -288,6 +305,8 @@ function AppContent({
               setEntries(JSON.parse(savedLogs));
             } catch (e) {}
           }
+        } finally {
+          setLoadingProfile(false);
         }
       };
 
@@ -556,7 +575,7 @@ function AppContent({
       <main className="relative z-10 px-4 pt-6 max-w-2xl mx-auto">
         
         {/* LOADING AUTH SPINNER */}
-        {loadingAuth ? (
+        {loadingAuth || (user && loadingProfile) ? (
           <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-4">
             <div className="w-10 h-10 border-4 border-primary-sage/30 border-t-primary-sage rounded-full animate-spin" />
             <p className="text-xs font-mono text-muted-text uppercase tracking-widest animate-pulse">
@@ -631,6 +650,31 @@ function AppContent({
               </button>
             </div>
           </div>
+        ) : (user && !isOfflineSandbox && (!userProfile || !userProfile.premiumActive)) ? (
+          /* HARD PAYWALL PAYMENT CONNECTION TAKE-OVER */
+          <DodoPaywallView 
+            user={user} 
+            userProfile={userProfile} 
+            onPaymentSuccess={async () => {
+              try {
+                const subRes = await fetch(`/api/verify-subscription?userId=${user.id}`);
+                if (subRes.ok) {
+                  const subData = await subRes.json();
+                  if (userProfile) {
+                    setUserProfile({
+                      ...userProfile,
+                      premiumActive: subData.premiumActive,
+                      trialDaysLeft: subData.trialDaysLeft,
+                      isTrial: subData.isTrial,
+                      subscriptionReason: subData.reason
+                    });
+                  }
+                }
+              } catch (err) {
+                console.error("Failed to re-verify after success:", err);
+              }
+            }} 
+          />
         ) : enterpriseActive ? (
           /* ENTERPRISE ADMIN OVERVIEW DEPLOYED */
           <EnterprisePortal onBack={() => setEnterpriseActive(false)} />

@@ -1,9 +1,12 @@
 {
-  "projectId": "flawless-datum-xw532",
-  "appId": "1:1026361592870:web:46146991359bfe84826ae7",
-  "apiKey": "AIzaSyCbNMi0u2K4H3UwPsfdk5fRKj2CGqpd0DQ",
-  "authDomain": "flawless-datum-xw532.firebaseapp.com",
-  "storageBucket": "flawless-datum-xw532.firebasestorage.app",
-  "messagingSenderId": "1026361592870",
-  "measurementId": ""
+  "projectId": "neuraliso-ai",
+  "appId": "1:725317819789:web:f5fe9845ca516cd87bf1c4",
+  "apiKey": "AIzaSyAuTILyXXfWxtrmXDBp23GwvLPl3SpUfwI",
+  "authDomain": "neuraliso-ai.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-sereneai-82cedc79-08f0-4e21-b410-72eba0f5b9f0",
+  "storageBucket": "neuraliso-ai.firebasestorage.app",
+  "messagingSenderId": "725317819789",
+  "measurementId": "",
+  "oAuthClientId": "725317819789-7665gsuvgkta92js0gc58hj04d3drfna.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

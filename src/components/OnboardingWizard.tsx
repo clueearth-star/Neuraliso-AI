@@ -69,8 +69,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   isAuth0Active
 }) => {
   // Firebase Auth Adaptation
-  const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [user, setUser] = useState<{ uid: string; displayName?: string; email?: string } | null>(() => {
+    if (isAuth0Active && currentUser) {
+      return {
+        uid: currentUser.uid || currentUser.id,
+        displayName: currentUser.displayName,
+        email: currentUser.email
+      };
+    }
+    return null;
+  });
+  const [isLoaded, setIsLoaded] = useState(() => !!(isAuth0Active && currentUser));
 
   useEffect(() => {
     if (isAuth0Active) {

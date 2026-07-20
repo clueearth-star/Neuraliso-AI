@@ -575,7 +575,7 @@ function AppContent({
       <main className="relative z-10 px-4 pt-6 max-w-2xl mx-auto">
         
         {/* LOADING AUTH SPINNER */}
-        {loadingAuth || (user && loadingProfile) ? (
+        {loadingAuth || (user && (loadingProfile || !userProfile)) ? (
           <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-4">
             <div className="w-10 h-10 border-4 border-primary-sage/30 border-t-primary-sage rounded-full animate-spin" />
             <p className="text-xs font-mono text-muted-text uppercase tracking-widest animate-pulse">
@@ -650,7 +650,7 @@ function AppContent({
               </button>
             </div>
           </div>
-        ) : (user && !isOfflineSandbox && (!userProfile || !userProfile.premiumActive)) ? (
+        ) : (user && !isOfflineSandbox && isOnboarded && (!userProfile || !userProfile.premiumActive)) ? (
           /* HARD PAYWALL PAYMENT CONNECTION TAKE-OVER */
           <DodoPaywallView 
             user={user} 
@@ -839,20 +839,46 @@ function AppWithSupabase() {
   const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Detect if we are currently loading right after an OAuth / Google login redirect
+    const isRedirect = window.location.hash.includes("access_token=") || 
+                       window.location.hash.includes("id_token=") || 
+                       window.location.search.includes("code=");
+
     // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSUser(session?.user || null);
-      setLoadingAuth(false);
+      if (!isMounted) return;
+      if (session) {
+        setSUser(session.user);
+        setLoadingAuth(false);
+      } else if (!isRedirect) {
+        // Only set loading to false if we are not in an OAuth redirect flow, otherwise wait for auth state change
+        setLoadingAuth(false);
+      }
     });
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSUser(session?.user || null);
       setLoadingAuth(false);
     });
 
+    // Fallback safety timeout in redirect flow to prevent infinite loading if the handshake fails
+    let timeoutId: any;
+    if (isRedirect) {
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          setLoadingAuth(false);
+        }
+      }, 3500);
+    }
+
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
 

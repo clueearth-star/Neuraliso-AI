@@ -77,6 +77,153 @@ const fallbackUsers: Record<string, any> = {};
 const fallbackEntries: Record<string, any[]> = {};
 const fallbackReviews: any[] = [];
 
+interface UserLimitState {
+  isPremium: boolean;
+  daily_message_count: number;
+  last_message_date: string;
+  limit: number;
+}
+
+async function getUserChatLimitState(userId: string): Promise<UserLimitState> {
+  const todayStr = new Date().toISOString().split("T")[0]; // UTC date e.g. "2026-07-19"
+  
+  let isPremium = false;
+  let dailyCount = 0;
+  let lastDate = todayStr;
+  
+  if (userId && userId !== "guest" && userId !== "offline") {
+    // 1. Try to get from database
+    try {
+      const baseUrl = getSupabaseUrl();
+      const apiKey = getSupabaseKey();
+      if (apiKey && baseUrl) {
+        const checkUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+        const checkRes = await fetch(checkUrl, {
+          method: "GET",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          }
+        });
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (Array.isArray(checkData) && checkData.length > 0) {
+            const dbUser = checkData[0];
+            isPremium = dbUser.premium_active ?? false;
+            dailyCount = dbUser.daily_message_count ?? 0;
+            lastDate = dbUser.last_message_date || "";
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[getUserChatLimitState Supabase Fail]:", e);
+    }
+  }
+
+  // 2. Fallback / Sync to memory cache
+  const key = userId || "guest";
+  if (!fallbackUsers[key]) {
+    fallbackUsers[key] = { id: key };
+  }
+  
+  if (isPremium) {
+    fallbackUsers[key].premium_active = true;
+  } else if (fallbackUsers[key].premium_active !== undefined) {
+    isPremium = fallbackUsers[key].premium_active;
+  }
+  
+  if (fallbackUsers[key].daily_message_count !== undefined && !dailyCount) {
+    dailyCount = fallbackUsers[key].daily_message_count;
+    lastDate = fallbackUsers[key].last_message_date || todayStr;
+  }
+  
+  // 3. Reset count if date has changed
+  if (lastDate !== todayStr) {
+    dailyCount = 0;
+    lastDate = todayStr;
+    
+    // Save the reset state in memory
+    fallbackUsers[key].daily_message_count = 0;
+    fallbackUsers[key].last_message_date = todayStr;
+  }
+  
+  const limit = isPremium ? 150 : 15;
+  
+  return {
+    isPremium,
+    daily_message_count: dailyCount,
+    last_message_date: lastDate,
+    limit
+  };
+}
+
+async function incrementUserChatCount(userId: string, state: UserLimitState) {
+  const key = userId || "guest";
+  const todayStr = new Date().toISOString().split("T")[0];
+  const newCount = state.daily_message_count + 1;
+  
+  // 1. Update in-memory fallback cache
+  if (!fallbackUsers[key]) {
+    fallbackUsers[key] = { id: key };
+  }
+  fallbackUsers[key].daily_message_count = newCount;
+  fallbackUsers[key].last_message_date = todayStr;
+  
+  // 2. Update database
+  if (userId && userId !== "guest" && userId !== "offline") {
+    try {
+      const baseUrl = getSupabaseUrl();
+      const apiKey = getSupabaseKey();
+      if (apiKey && baseUrl) {
+        const updatePayload: any = {
+          daily_message_count: newCount,
+          last_message_date: todayStr,
+          updated_at: new Date().toISOString()
+        };
+        
+        let retries = 5;
+        let upsertRes;
+        while (retries > 0) {
+          const updateUrl = `${baseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+          upsertRes = await fetch(updateUrl, {
+            method: "PATCH",
+            headers: {
+              "apikey": apiKey,
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify(updatePayload)
+          });
+          
+          if (upsertRes.status === 400) {
+            const errorText = await upsertRes.clone().text();
+            try {
+              const errObj = JSON.parse(errorText);
+              if (errObj.code === "PGRST204" && errObj.message) {
+                const match = errObj.message.match(/Could not find the '([^']+)' column/);
+                if (match && match[1]) {
+                  const missingColumn = match[1];
+                  console.warn(`[Self-Healing Schema Chat Count] Pruning missing column '${missingColumn}' from payload.`);
+                  delete updatePayload[missingColumn];
+                  retries--;
+                  continue;
+                }
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn("[incrementUserChatCount Supabase Fail]:", e);
+    }
+  }
+}
+
 /**
  * Safely resolves the API key to use. We check the environment's NVIDIA_API_KEY
  * or custom GEMINI_API_KEY before using the high-performance premium fallback key.
@@ -432,13 +579,55 @@ function setCachedData(key: string, data: any, ttlSeconds: number) {
   });
 }
 
+// Diagnostic health check route
+app.get("/api/health", (req, res) => {
+  res.json({
+    SUPABASE_URL: typeof process.env.SUPABASE_URL === "string" && process.env.SUPABASE_URL.trim() !== "",
+    SUPABASE_SERVICE_ROLE_KEY: typeof process.env.SUPABASE_SERVICE_ROLE_KEY === "string" && process.env.SUPABASE_SERVICE_ROLE_KEY.trim() !== "",
+    VITE_SUPABASE_URL: typeof process.env.VITE_SUPABASE_URL === "string" && process.env.VITE_SUPABASE_URL.trim() !== "",
+    VITE_SUPABASE_ANON_KEY: typeof process.env.VITE_SUPABASE_ANON_KEY === "string" && process.env.VITE_SUPABASE_ANON_KEY.trim() !== "",
+    GEMINI_API_KEY: typeof process.env.GEMINI_API_KEY === "string" && process.env.GEMINI_API_KEY.trim() !== ""
+  });
+});
+
+// API: Chat limits status check
+app.get("/api/chat/limits", async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    const resolvedUserId = userId || "guest";
+    const limitState = await getUserChatLimitState(resolvedUserId);
+    res.json({
+      daily_message_count: limitState.daily_message_count,
+      limit: limitState.limit,
+      isPremium: limitState.isPremium
+    });
+  } catch (err: any) {
+    console.error("[GET /api/chat/limits] Error:", err.message || err);
+    res.status(500).json({ error: err.message || "Failed to retrieve chat limits" });
+  }
+});
+
 // 1. API: Chat endpoint
 app.post("/api/chat", async (req, res) => {
+  let resolvedUserId = "guest";
+  let limitState: UserLimitState = { isPremium: false, daily_message_count: 0, last_message_date: "", limit: 15 };
   try {
-    const { message, history } = req.body;
+    const { message, history, userId } = req.body;
+    resolvedUserId = userId || "guest";
     
     if (!message) {
       return res.status(400).json({ error: "Message is required." });
+    }
+
+    // Daily Message Limit Check
+    limitState = await getUserChatLimitState(resolvedUserId);
+    if (limitState.daily_message_count >= limitState.limit) {
+      return res.json({
+        limitReached: true,
+        reply: "You've reached your daily message limit. Upgrade to Premium for more, or come back tomorrow.",
+        daily_message_count: limitState.daily_message_count,
+        limit: limitState.limit
+      });
     }
 
     // Safety Override check
@@ -446,6 +635,8 @@ app.post("/api/chat", async (req, res) => {
       return res.json({
         safetyTriggered: true,
         reply: "You Are Not Alone 💙 Help is available right now. You do not have to go through this alone.",
+        daily_message_count: limitState.daily_message_count,
+        limit: limitState.limit
       });
     }
 
@@ -453,7 +644,11 @@ app.post("/api/chat", async (req, res) => {
     const cacheKey = `chat_${JSON.stringify({ message, history, mode: req.body.mode })}`;
     const cachedResponse = getCachedData(cacheKey);
     if (cachedResponse) {
-      return res.json(cachedResponse);
+      return res.json({
+        ...cachedResponse,
+        daily_message_count: limitState.daily_message_count,
+        limit: limitState.limit
+      });
     }
 
     const apiKey = getApiKey();
@@ -466,7 +661,16 @@ app.post("/api/chat", async (req, res) => {
         "I am listening. Regardless of how stormy things look, you are in a safe space. Would you like to try a quick grounding exercise together, or simply continue sharing what's on your mind?"
       ];
       const randomReply = replies[Math.floor(Math.random() * replies.length)];
-      const resultPayload = { reply: randomReply, simulated: true };
+      
+      await incrementUserChatCount(resolvedUserId, limitState);
+      const updatedLimitState = await getUserChatLimitState(resolvedUserId);
+      
+      const resultPayload = { 
+        reply: randomReply, 
+        simulated: true,
+        daily_message_count: updatedLimitState.daily_message_count,
+        limit: updatedLimitState.limit
+      };
       setCachedData(cacheKey, resultPayload, 120); // cache for 2 mins
       return res.json(resultPayload);
     }
@@ -528,17 +732,28 @@ app.post("/api/chat", async (req, res) => {
       return res.json({
         safetyTriggered: true,
         reply: "You Are Not Alone 💙 Help is available right now. You do not have to go through this alone.",
+        daily_message_count: limitState.daily_message_count,
+        limit: limitState.limit
       });
     }
 
-    const resultPayload = { reply };
+    await incrementUserChatCount(resolvedUserId, limitState);
+    const updatedLimitState = await getUserChatLimitState(resolvedUserId);
+
+    const resultPayload = { 
+      reply,
+      daily_message_count: updatedLimitState.daily_message_count,
+      limit: updatedLimitState.limit
+    };
     setCachedData(cacheKey, resultPayload, 120); // cache for 2 mins
     res.json(resultPayload);
   } catch (error: any) {
     console.log("[Serene AI] Routing pipeline update.");
     res.json({ 
       reply: "I am sensing a little turbulence in our connection. Let's take a deep breath together. I am still here to support you.",
-      error: error.message 
+      error: error.message,
+      daily_message_count: limitState ? limitState.daily_message_count : 0,
+      limit: limitState ? limitState.limit : 15
     });
   }
 });

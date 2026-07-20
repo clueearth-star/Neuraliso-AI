@@ -108,6 +108,28 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
     localStorage.setItem("neuraliso_selected_voice", voiceId);
   };
   const [uiModeState, setUiModeState] = useState<string>("FLOATING_HEAD");
+  const [dailyCount, setDailyCount] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchLimits = async () => {
+      try {
+        const response = await fetch(`/api/chat/limits?userId=${userId || "guest"}`);
+        if (response.ok && active) {
+          const data = await response.json();
+          setDailyCount(data.daily_message_count);
+          setDailyLimit(data.limit);
+        }
+      } catch (err) {
+        console.error("Failed to fetch limits:", err);
+      }
+    };
+    fetchLimits();
+    return () => {
+      active = false;
+    };
+  }, [userId]);
   const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -358,7 +380,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         body: JSON.stringify({
           message: text,
           history: historyMapped,
-          mode: "voice"
+          mode: "voice",
+          userId: userId || "guest"
         })
       });
 
@@ -371,6 +394,27 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
       }
 
       setIsTyping(false);
+
+      if (data.daily_message_count !== undefined) {
+        setDailyCount(data.daily_message_count);
+      }
+      if (data.limit !== undefined) {
+        setDailyLimit(data.limit);
+      }
+
+      if (data.limitReached) {
+        const botMsg: Message = {
+          id: "msg-" + Date.now() + "-bot",
+          sender: "bot",
+          text: data.reply || "You've reached your daily message limit. Upgrade to Premium for more, or come back tomorrow.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        setVoiceCallActive(false);
+        localStorage.removeItem("neuraliso_voice_mode_active");
+        speakAI(botMsg.text);
+        return;
+      }
 
       if (data.safetyTriggered) {
         onTriggerSafety(true);
@@ -522,7 +566,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: textToSend,
-          history: historyMapped
+          history: historyMapped,
+          userId: userId || "guest"
         })
       });
 
@@ -536,6 +581,24 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         data = { reply: "I felt a momentary wobble in my mental frequency. Let's take a calm breath and try again." };
       }
       setIsTyping(false);
+
+      if (data.daily_message_count !== undefined) {
+        setDailyCount(data.daily_message_count);
+      }
+      if (data.limit !== undefined) {
+        setDailyLimit(data.limit);
+      }
+
+      if (data.limitReached) {
+        const botMsg: Message = {
+          id: "msg-" + Date.now() + "-bot",
+          sender: "bot",
+          text: data.reply || "You've reached your daily message limit. Upgrade to Premium for more, or come back tomorrow.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        return;
+      }
 
       if (data.safetyTriggered) {
         onTriggerSafety(true);
@@ -623,6 +686,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
           <div>
             <h3 className="font-sans font-bold text-dark-text text-sm">Neuraliso AI Companion</h3>
             <p className="text-[10px] text-muted-text">Powered by Gemini CBT Guard</p>
+            {dailyLimit !== null && dailyCount !== null && (
+              <p className="text-[9px] text-indigo-600 font-semibold mt-0.5 font-mono">
+                {Math.max(0, dailyLimit - dailyCount)} of {dailyLimit} messages left today
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">

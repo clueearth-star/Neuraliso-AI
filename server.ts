@@ -590,6 +590,14 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Secure endpoint to supply verified client config (safe public anon credentials)
+app.get("/api/supabase-config", (req, res) => {
+  res.json({
+    supabaseUrl: getSupabaseUrl(),
+    supabaseAnonKey: getSupabaseKey()
+  });
+});
+
 // API: Chat limits status check
 app.get("/api/chat/limits", async (req, res) => {
   try {

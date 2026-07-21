@@ -46,7 +46,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
-import { supabase } from "./lib/supabase";
+import { supabase, reinitializeSupabase } from "./lib/supabase";
 
 interface AppContentProps {
   user: {
@@ -919,8 +919,9 @@ function AppWithSupabase() {
 
   useEffect(() => {
     let isMounted = true;
+    let subscription: { unsubscribe: () => void } | null = null;
+    let timeoutId: any;
 
-    // Detect if we are currently loading right after an OAuth / Google login redirect
     const isRedirect = window.location.hash.includes("access_token=") || 
                        window.location.hash.includes("id_token=") || 
                        window.location.search.includes("code=");
@@ -933,65 +934,92 @@ function AppWithSupabase() {
       "isRedirect: " + isRedirect
     );
 
-    // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log(
-        "[Auth debug] getSession returned - " +
-        "Has Session: " + (!!session) + ", " +
-        "User ID: " + (session?.user?.id || "null") + ", " +
-        "isRedirect: " + isRedirect
-      );
-      if (isMounted) {
-        setAuthDebug(prev => ({
-          ...prev,
-          hasSession: session ? "yes" : "no",
-          lastEvent: prev.lastEvent === "none yet" ? "INITIAL_SESSION (from getSession)" : prev.lastEvent,
-          lastEventUser: session?.user?.id || "null"
-        }));
+    async function initAuth() {
+      try {
+        // 1. Fetch dynamic client config from express proxy (always matches server keys securely)
+        const configRes = await fetch("/api/supabase-config");
+        if (configRes.ok && isMounted) {
+          const config = await configRes.json();
+          reinitializeSupabase(config.supabaseUrl, config.supabaseAnonKey);
+        }
+      } catch (err) {
+        console.warn("[Auth Debug] Failed to fetch dynamic supabase config, relying on fallback client initialization.", err);
       }
-      if (!isMounted) return;
-      if (session) {
-        setSUser(session.user);
-        setLoadingAuth(false);
-      } else if (!isRedirect) {
-        // Only set loading to false if we are not in an OAuth redirect flow, otherwise wait for auth state change
-        setLoadingAuth(false);
-      }
-    });
 
-    // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log(
-        "[Auth debug] onAuthStateChange event fired: " + _event + " - " +
-        "Has Session: " + (!!session) + ", " +
-        "User ID: " + (session?.user?.id || "null")
-      );
-      if (isMounted) {
-        setAuthDebug(prev => ({
-          ...prev,
-          hasSession: session ? "yes" : "no",
-          lastEvent: _event,
-          lastEventUser: session?.user?.id || "null"
-        }));
-      }
       if (!isMounted) return;
-      setSUser(session?.user || null);
-      setLoadingAuth(false);
-    });
 
-    // Fallback safety timeout in redirect flow to prevent infinite loading if the handshake fails
-    let timeoutId: any;
+      // Now we have the correct supabase client initialized!
+      // 2. Get initial session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log(
+          "[Auth debug] getSession returned - " +
+          "Has Session: " + (!!session) + ", " +
+          "User ID: " + (session?.user?.id || "null") + ", " +
+          "isRedirect: " + isRedirect
+        );
+        if (isMounted) {
+          setAuthDebug(prev => ({
+            ...prev,
+            hasSession: session ? "yes" : "no",
+            lastEvent: prev.lastEvent === "none yet" ? "INITIAL_SESSION (from getSession)" : prev.lastEvent,
+            lastEventUser: session?.user?.id || "null"
+          }));
+        }
+        if (!isMounted) return;
+        if (session) {
+          setSUser(session.user);
+          setLoadingAuth(false);
+        } else if (!isRedirect) {
+          setLoadingAuth(false);
+        }
+      });
+
+      // 3. Listen for auth changes
+      const authListener = supabase.auth.onAuthStateChange((_event, session) => {
+        console.log(
+          "[Auth debug] onAuthStateChange event fired: " + _event + " - " +
+          "Has Session: " + (!!session) + ", " +
+          "User ID: " + (session?.user?.id || "null")
+        );
+        if (isMounted) {
+          setAuthDebug(prev => ({
+            ...prev,
+            hasSession: session ? "yes" : "no",
+            lastEvent: _event,
+            lastEventUser: session?.user?.id || "null"
+          }));
+        }
+        if (!isMounted) return;
+        
+        if (session) {
+          setSUser(session.user);
+          setLoadingAuth(false);
+        } else {
+          setSUser(null);
+          if (!isRedirect || _event === "SIGNED_OUT") {
+            setLoadingAuth(false);
+          }
+        }
+      });
+
+      subscription = authListener.data.subscription;
+    }
+
+    initAuth();
+
     if (isRedirect) {
       timeoutId = setTimeout(() => {
         if (isMounted) {
           setLoadingAuth(false);
         }
-      }, 3500);
+      }, 5000); // Give dynamic configuration fetch and handshake an extra buffer
     }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);

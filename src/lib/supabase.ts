@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = 
   (typeof process !== "undefined" && process.env?.SUPABASE_URL) || 
   (import.meta as any).env?.VITE_SUPABASE_URL || 
-  "https://tmmrquzeoykocirbempg.supabase.co"; // Default fallback if undefined
+  "https://siewuccllcisezwyiyaz.supabase.co"; // Correct default fallback project URL
 
 const supabaseAnonKey = 
   (typeof process !== "undefined" && process.env?.SUPABASE_ANON_KEY) || 
@@ -14,8 +14,29 @@ const supabaseAnonKey =
 
 if (!supabaseAnonKey) {
   console.warn(
-    "[Supabase Client] SUPABASE_ANON_KEY is empty. Supabase features may fail until the anon key is supplied in your environment."
+    "[Supabase Client] SUPABASE_ANON_KEY is empty. We will fetch secure client config on startup."
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export let supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true
+  }
+});
+
+/**
+ * Dynamically reinitializes the live exported Supabase client instance using live config.
+ */
+export function reinitializeSupabase(url: string, key: string) {
+  if (!url || !key) return;
+  console.log("[Supabase Client] Dynamically reinitializing client with URL:", url);
+  supabase = createClient(url, key, {
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true
+    }
+  });
+}

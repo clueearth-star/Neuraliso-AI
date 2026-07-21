@@ -12,6 +12,7 @@ interface HomeViewProps {
   setCurrentStress: (val: number) => void;
   userName?: string;
   onJournalWithCard?: (note: string) => void;
+  wellnessScore?: number;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -21,6 +22,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   setCurrentStress,
   userName,
   onJournalWithCard,
+  wellnessScore,
 }) => {
   const [affirmation, setAffirmation] = useState("Your strength isn't defined by how much you can carry, but how tenderly you hold yourself through the storm.");
   const [insight, setInsight] = useState("Taking small, conscious breaths can slow down your stress response in less than sixty seconds.");
@@ -141,7 +143,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return Math.min(Math.max(Math.round(stressInversed + logBonus), 10), 100);
   };
 
-  const activeWellnessScore = getDynamicWellnessScore();
+  // The database score is the SINGLE source of truth for the displayed Wellness Index.
+  // There is no secondary locally-calculated value that can drift out of sync.
+  const activeWellnessScore = wellnessScore !== undefined ? wellnessScore : getDynamicWellnessScore();
 
   // Dynamic Routine generation depending on active user mood (If Sad, If Anxious, If Lonely, If Overwhelmed)
   const getLastLoggedMood = () => {

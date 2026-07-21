@@ -84,7 +84,16 @@ function AppContent({
   authDebug
 }: AppContentProps) {
   const [activeView, setActiveView] = useState<ActiveView>("home");
-  const [currentStress, setCurrentStress] = useState<number>(4);
+  const [currentStress, setCurrentStress] = useState<number>(() => {
+    const saved = localStorage.getItem("neuraliso_onboarding_profile");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.stressBaseline ?? 4;
+      } catch (e) {}
+    }
+    return 4;
+  });
   const [crisisActive, setCrisisActive] = useState<boolean>(false);
 
   // Synchronous page view tracking in GA4
@@ -223,6 +232,9 @@ function AppContent({
             }
 
             const hasCompletedOnboarding = data.completedOnboarding ?? false;
+            const dbStress = data.stressBaseline !== undefined ? data.stressBaseline : (data.initialScore ? Math.round((100 - data.initialScore) / 9) : 4);
+            setCurrentStress(dbStress);
+            
             setUserProfile({
               userId: data.userId || user.id,
               displayName: data.displayName || user.displayName || "Neuraliso Seeker",
@@ -357,6 +369,48 @@ function AppContent({
     }
   }, [loadingAuth, user, isOfflineSandbox]);
 
+  // Update stress and score and save to database immediately
+  const handleUpdateStressAndScore = async (newStress: number) => {
+    setCurrentStress(newStress);
+    const logBonus = Math.min(entries.length * 4, 10);
+    const calculatedScore = Math.min(Math.max(Math.round((100 - (newStress * 9)) + logBonus), 10), 100);
+
+    const updatedProfile = {
+      ...(userProfile || {
+        userId: user?.id || "OFFLINE-SANDBOX-USER",
+        displayName: "Neuraliso Seeker",
+        premiumActive: false,
+        themeMode: "light" as const,
+        notificationsEnabled: true,
+      }),
+      initialScore: calculatedScore,
+      stressBaseline: newStress,
+    };
+
+    setUserProfile(updatedProfile as any);
+    localStorage.setItem("neuraliso_onboarding_profile", JSON.stringify(updatedProfile));
+
+    if (user) {
+      try {
+        await fetch("/api/user-profile", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...updatedProfile,
+            id: user.id,
+            userId: user.id,
+            initialScore: calculatedScore,
+            stressBaseline: newStress
+          })
+        });
+      } catch (err) {
+        console.warn("Failed to update stress level in database:", err);
+      }
+    }
+  };
+
   // Sync to database or local storage fallback
   const handleSaveEntry = async (newEntry: JournalEntry) => {
     // Play comforting sound and log Google Analytics custom event
@@ -367,6 +421,27 @@ function AppContent({
       energy: newEntry.energy,
       note_length: newEntry.note?.length || 0,
     });
+
+    const newStress = newEntry.stress;
+    setCurrentStress(newStress);
+    const newEntriesCount = entries.length + 1;
+    const logBonus = Math.min(newEntriesCount * 4, 10);
+    const calculatedScore = Math.min(Math.max(Math.round((100 - (newStress * 9)) + logBonus), 10), 100);
+
+    const updatedProfile = {
+      ...(userProfile || {
+        userId: user?.id || "OFFLINE-SANDBOX-USER",
+        displayName: "Neuraliso Seeker",
+        premiumActive: false,
+        themeMode: "light" as const,
+        notificationsEnabled: true,
+      }),
+      initialScore: calculatedScore,
+      stressBaseline: newStress,
+    };
+
+    setUserProfile(updatedProfile as any);
+    localStorage.setItem("neuraliso_onboarding_profile", JSON.stringify(updatedProfile));
 
     if (!user) {
       setEntries((prev) => {
@@ -391,6 +466,23 @@ function AppContent({
       
       if (response.ok) {
         setEntries((prev) => [...prev, newEntry]);
+        
+        // Save the updated score and stress immediately to the profile in the database
+        await fetch("/api/user-profile", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...updatedProfile,
+            id: user.id,
+            userId: user.id,
+            initialScore: calculatedScore,
+            stressBaseline: newStress
+          })
+        }).catch((err) => {
+          console.warn("Failed to update profile score in database during check-in:", err);
+        });
       } else {
         const errData = await response.json().catch(() => ({}));
         if (response.status === 403) {
@@ -739,8 +831,9 @@ function AppContent({
                 onNavigate={(v) => setActiveView(v)}
                 entries={entries}
                 currentStress={currentStress}
-                setCurrentStress={setCurrentStress}
+                setCurrentStress={handleUpdateStressAndScore}
                 userName={user ? user.displayName || userProfile?.displayName : (userProfile?.displayName || "Guest Seeker")}
+                wellnessScore={userProfile?.initialScore}
               />
             )}
 

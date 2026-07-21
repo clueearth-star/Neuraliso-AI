@@ -63,6 +63,13 @@ interface AppContentProps {
   loginWithEmail: (email: string, pass: string) => Promise<any>;
   loginAnonymously: () => Promise<any>;
   isAuth0Active: boolean;
+  authDebug?: {
+    hasSession: string;
+    lastEvent: string;
+    lastEventUser: string;
+    url: string;
+    isRedirect: boolean;
+  };
 }
 
 function AppContent({
@@ -73,7 +80,8 @@ function AppContent({
   registerWithEmail,
   loginWithEmail,
   loginAnonymously,
-  isAuth0Active
+  isAuth0Active,
+  authDebug
 }: AppContentProps) {
   const [activeView, setActiveView] = useState<ActiveView>("home");
   const [currentStress, setCurrentStress] = useState<number>(4);
@@ -193,6 +201,7 @@ function AppContent({
             throw new Error(`Profile query failed with status ${res.status}`);
           }
           const data = await res.json();
+          console.log("[Auth debug] syncProfileAndData fetched profile data:", data);
           
           if (data) {
             // Real-time server-side verified subscription status check (never trust client flags)
@@ -279,6 +288,7 @@ function AppContent({
             }
           }
         } catch (error) {
+          console.warn("[Auth debug] syncProfileAndData failed, error details:", error);
           console.warn("Supabase profile secure handshake fallback active:", error);
           
           // Retrieve onboarding data fallback if present
@@ -553,8 +563,68 @@ function AppContent({
     ? "theme-neutral text-gray-900 selection:bg-amber-100 selection:text-amber-900" 
     : "theme-light text-dark-text selection:bg-soft-green selection:text-deep-sage";
 
+  const isSpinnerActive = loadingAuth || (user && (loadingProfile || !userProfile));
+  const isCrisisTakeover = !isSpinnerActive && crisisActive;
+  const isPaywallActive = !isSpinnerActive && !isCrisisTakeover && (user && !isOfflineSandbox && isOnboarded && (!userProfile || !userProfile.premiumActive));
+  const isEnterpriseActiveMode = !isSpinnerActive && !isCrisisTakeover && !isPaywallActive && enterpriseActive;
+  const isOnboardingActive = !isSpinnerActive && !isCrisisTakeover && !isPaywallActive && !isEnterpriseActiveMode && (!isOnboarded && !isOfflineSandbox);
+
+  console.log(
+    "[Auth debug] Decide render - " +
+    "user: " + (user ? user.id : "null") + ", " +
+    "loadingAuth: " + loadingAuth + ", " +
+    "loadingProfile: " + loadingProfile + ", " +
+    "userProfile: " + (userProfile ? JSON.stringify({ userId: userProfile.userId, completedOnboarding: userProfile.completedOnboarding }) : "null") + ", " +
+    "isOnboarded: " + isOnboarded + ", " +
+    "isOfflineSandbox: " + isOfflineSandbox + 
+    " -> Rendering Choice: " +
+    (isSpinnerActive ? "LOADING AUTH SPINNER" :
+     isCrisisTakeover ? "CRISIS TAKEOVER" :
+     isPaywallActive ? "PAYWALL" :
+     isEnterpriseActiveMode ? "ENTERPRISE PORTAL" :
+     isOnboardingActive ? (user ? "ONBOARDING STEPS (Step 1-4)" : "LANDING PAGE (Auth Options)") :
+     "REGULAR VIEW ROUTING (Main App)")
+  );
+
+  const renderedChoiceName = isSpinnerActive ? "LOADING AUTH SPINNER" :
+     isCrisisTakeover ? "CRISIS TAKEOVER" :
+     isPaywallActive ? "PAYWALL" :
+     isEnterpriseActiveMode ? "ENTERPRISE PORTAL" :
+     isOnboardingActive ? (user ? "ONBOARDING STEPS (Step 1-4)" : "LANDING PAGE (Auth Options)") :
+     "REGULAR VIEW ROUTING (Main App)";
+
   return (
-    <div className={`min-h-screen relative font-sans pb-24 overflow-x-hidden transition-colors duration-500 ${bgClass}`}>
+    <div className={`min-h-screen relative font-sans pb-24 pt-44 md:pt-32 overflow-x-hidden transition-colors duration-500 ${bgClass}`}>
+      
+      {/* ON-SCREEN LIVE AUTH DEBUG OVERLAY (Bright Yellow high-contrast banner) */}
+      <div 
+        id="live-auth-debug-banner"
+        className="fixed top-0 left-0 right-0 z-[99999] bg-yellow-300 border-b-4 border-yellow-500 text-neutral-900 p-4 text-xs font-mono shadow-2xl flex flex-col md:flex-row gap-4 md:items-center justify-between"
+      >
+        <div className="flex flex-col gap-1.5 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-600 animate-ping" />
+            <strong className="text-black uppercase tracking-wider text-[12px] bg-yellow-400 px-1.5 py-0.5 rounded">🛠️ LIVE SUPABASE AUTH DEBUGGER (Temporary Overlay)</strong>
+          </div>
+          <div>
+            <strong>Session Found:</strong> <span className={authDebug?.hasSession === 'yes' ? 'text-green-800 font-bold bg-green-200 px-1.5 py-0.5 rounded' : authDebug?.hasSession === 'no' ? 'text-red-800 font-bold bg-red-200 px-1.5 py-0.5 rounded' : 'text-neutral-800 bg-yellow-200 px-1.5 py-0.5 rounded animate-pulse'}>{authDebug?.hasSession || "checking"}</span> | 
+            <strong> Last Event:</strong> <span className="bg-neutral-800 text-yellow-300 font-bold px-1.5 py-0.5 rounded">{authDebug?.lastEvent || "none yet"}</span> | 
+            <strong> Event User:</strong> <span className="bg-neutral-100 text-neutral-800 font-bold px-1.5 py-0.5 rounded text-[10px]">{authDebug?.lastEventUser || "null"}</span>
+          </div>
+          <div>
+            <strong>Current Screen Selected:</strong> <span className="bg-black text-white font-black px-2 py-0.5 rounded text-[11px] uppercase tracking-wide">{renderedChoiceName}</span>
+          </div>
+          <div className="text-[10px] text-neutral-700 mt-1 max-w-4xl break-all">
+            <strong>Decision logic parameters:</strong> user={user ? user.id : 'null'} | loadingAuth={loadingAuth ? 'true' : 'false'} | loadingProfile={loadingProfile ? 'true' : 'false'} | userProfile={userProfile ? 'loaded' : 'null'} | isOnboarded={isOnboarded ? 'true' : 'false'} | isOfflineSandbox={isOfflineSandbox ? 'true' : 'false'}
+          </div>
+          <div className="text-[10px] text-neutral-600 max-w-4xl break-all">
+            <strong>URL Info:</strong> isRedirect={authDebug?.isRedirect ? 'true' : 'false'} | href={authDebug?.url || 'n/a'}
+          </div>
+        </div>
+        <div className="text-[10px] text-left text-neutral-800 whitespace-nowrap bg-yellow-200 p-2 rounded border border-yellow-400">
+          * Please take a screenshot / copy-paste<br />these values and send them in!
+        </div>
+      </div>
       
       {/* BACKGROUND DECORATIONS (Calm Technology leaves and nature waves) */}
       <div className="absolute top-0 left-0 w-full h-[600px] pointer-events-none overflow-hidden blur-3xl z-0 select-none">
@@ -837,6 +907,15 @@ function AppContent({
 function AppWithSupabase() {
   const [sUser, setSUser] = useState<any>(null);
   const [loadingAuth, setLoadingAuth] = useState<boolean>(true);
+  const [authDebug, setAuthDebug] = useState({
+    hasSession: "checking",
+    lastEvent: "none yet",
+    lastEventUser: "null",
+    url: window.location.href,
+    isRedirect: window.location.hash.includes("access_token=") || 
+                window.location.hash.includes("id_token=") || 
+                window.location.search.includes("code=")
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -846,8 +925,30 @@ function AppWithSupabase() {
                        window.location.hash.includes("id_token=") || 
                        window.location.search.includes("code=");
 
+    console.log(
+      "[Auth debug] Client mounting - " +
+      "URL: " + window.location.href + ", " +
+      "Hash: " + window.location.hash + ", " +
+      "Search: " + window.location.search + ", " +
+      "isRedirect: " + isRedirect
+    );
+
     // 1. Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log(
+        "[Auth debug] getSession returned - " +
+        "Has Session: " + (!!session) + ", " +
+        "User ID: " + (session?.user?.id || "null") + ", " +
+        "isRedirect: " + isRedirect
+      );
+      if (isMounted) {
+        setAuthDebug(prev => ({
+          ...prev,
+          hasSession: session ? "yes" : "no",
+          lastEvent: prev.lastEvent === "none yet" ? "INITIAL_SESSION (from getSession)" : prev.lastEvent,
+          lastEventUser: session?.user?.id || "null"
+        }));
+      }
       if (!isMounted) return;
       if (session) {
         setSUser(session.user);
@@ -860,6 +961,19 @@ function AppWithSupabase() {
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log(
+        "[Auth debug] onAuthStateChange event fired: " + _event + " - " +
+        "Has Session: " + (!!session) + ", " +
+        "User ID: " + (session?.user?.id || "null")
+      );
+      if (isMounted) {
+        setAuthDebug(prev => ({
+          ...prev,
+          hasSession: session ? "yes" : "no",
+          lastEvent: _event,
+          lastEventUser: session?.user?.id || "null"
+        }));
+      }
       if (!isMounted) return;
       setSUser(session?.user || null);
       setLoadingAuth(false);
@@ -944,6 +1058,7 @@ function AppWithSupabase() {
       loginWithEmail={handleLoginWithEmail}
       loginAnonymously={handleLoginAnonymously}
       isAuth0Active={true}
+      authDebug={authDebug}
     />
   );
 }

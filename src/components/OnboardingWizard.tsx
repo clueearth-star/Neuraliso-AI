@@ -120,6 +120,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [nameInput, setNameInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [emailConfirmationRequired, setEmailConfirmationRequired] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
 
   // Debug state for signup / auth submission
   const [signupDebug, setSignupDebug] = useState<{
@@ -275,20 +277,40 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     setAuthLoading(true);
     setAuthError(null);
+    setEmailConfirmationRequired(false);
 
     try {
-      let registeredUser: any = null;
+      let registeredRes: any = null;
       if (isAuth0Active && registerWithEmail) {
-        registeredUser = await registerWithEmail(currEmail, currPass, currName);
+        registeredRes = await registerWithEmail(currEmail, currPass, currName);
       } else {
-        registeredUser = await firebaseRegisterWithEmail(currEmail, currPass, currName);
+        registeredRes = await firebaseRegisterWithEmail(currEmail, currPass, currName);
       }
 
-      const successText = `Success: Registered account successfully! (User ID: ${registeredUser?.id || registeredUser?.uid || "created"}, Email: ${registeredUser?.email || currEmail})`;
-      setSignupDebug(prev => ({
-        ...prev,
-        supabaseResult: successText
-      }));
+      // Supabase returns { user, session } or user object
+      const regUser = registeredRes?.user || (registeredRes?.uid || registeredRes?.id ? registeredRes : null);
+      const regSession = registeredRes?.session || null;
+
+      if (regSession) {
+        // Email confirmation is NOT required (active session created immediately)
+        const successText = `Success (Active Session): Registered & Logged in! User ID: ${regUser?.id || "created"}. Transitioning to onboarding...`;
+        setSignupDebug(prev => ({
+          ...prev,
+          supabaseResult: successText
+        }));
+        setSubView("step1");
+      } else if (regUser) {
+        // Email confirmation IS REQUIRED by Supabase project settings (no active session returned)
+        setEmailConfirmationRequired(true);
+        setRegisteredEmail(currEmail);
+        const pendingText = `Success (Email Confirmation Required): Account created (User ID: ${regUser.id || regUser.uid}). Supabase project auth settings REQUIRE email confirmation before logging in — no active session was returned by signUp(). Please check your email inbox to confirm your account.`;
+        setSignupDebug(prev => ({
+          ...prev,
+          supabaseResult: pendingText
+        }));
+      } else {
+        setSubView("step1");
+      }
     } catch (err: any) {
       const errDetail = err.message || err.error_description || String(err);
       setAuthError(errDetail);
@@ -881,6 +903,37 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           </button>
                         </div>
                       </form>
+                    )}
+
+                    {/* EMAIL CONFIRMATION REQUIRED NOTICE BANNER */}
+                    {emailConfirmationRequired && (
+                      <div className="w-full bg-amber-950/90 text-amber-100 p-4 rounded-2xl border border-amber-400/80 shadow-xl text-left space-y-2 text-xs my-3 animate-fade-in">
+                        <div className="flex items-center gap-2 font-bold text-amber-300 text-sm border-b border-amber-800/80 pb-1.5">
+                          <span>✉️ Check Your Email to Confirm Account</span>
+                        </div>
+                        <p className="leading-relaxed">
+                          Your account for <strong className="text-white">{registeredEmail}</strong> was created successfully!
+                        </p>
+                        <p className="leading-relaxed text-amber-200/90">
+                          <strong>Note:</strong> "Confirm Email" is currently <strong>REQUIRED</strong> in this Supabase project's Auth settings. Supabase does not grant an active login session until you click the link in your email.
+                        </p>
+                        <p className="text-[11px] text-amber-300/80 italic">
+                          Please check your email inbox (and spam folder), click the confirmation link, then return here and tap "Go to Login 🔑".
+                        </p>
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthMode("email_login");
+                              setEmailConfirmationRequired(false);
+                              setAuthError(null);
+                            }}
+                            className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow"
+                          >
+                            Go to Login 🔑
+                          </button>
+                        </div>
+                      </div>
                     )}
 
                     {/* ON-SCREEN SIGNUP DEBUG OUTPUT BANNER */}

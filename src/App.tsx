@@ -1149,7 +1149,7 @@ function AppWithSupabase() {
       }
     });
     if (error) throw error;
-    return data.user;
+    return { user: data.user, session: data.session };
   };
 
   const handleLogout = async () => {

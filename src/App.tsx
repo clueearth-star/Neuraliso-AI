@@ -107,6 +107,10 @@ function AppContent({
     premiumActive: boolean;
     trialDaysLeft?: number | null;
     isTrial?: boolean;
+    accessApp?: boolean;
+    canAccessInsights?: boolean;
+    historyDaysLimit?: number | null;
+    chatLimit?: number;
     subscriptionReason?: string;
     themeMode: "light" | "neutral";
     notificationsEnabled: boolean;
@@ -217,14 +221,22 @@ function AppContent({
             let verifiedPremium = data.premiumActive ?? false;
             let trialDaysLeft = null;
             let isTrial = false;
+            let accessApp = true;
+            let canAccessInsights = true;
+            let historyDaysLimit: number | null = null;
+            let chatLimit = 150;
             let subscriptionReason = undefined;
             try {
-              const subRes = await fetch(`/api/verify-subscription?userId=${user.id}`);
+              const subRes = await fetch(`/api/verify-subscription?userId=${user.id}&email=${encodeURIComponent(user.email || "")}`);
               if (subRes.ok) {
                 const subData = await subRes.json();
                 verifiedPremium = subData.premiumActive;
                 trialDaysLeft = subData.trialDaysLeft;
                 isTrial = subData.isTrial;
+                accessApp = subData.accessApp ?? true;
+                canAccessInsights = subData.canAccessInsights ?? true;
+                historyDaysLimit = subData.historyDaysLimit ?? null;
+                chatLimit = subData.chatLimit ?? 20;
                 subscriptionReason = subData.reason;
               }
             } catch (subErr) {
@@ -241,6 +253,10 @@ function AppContent({
               premiumActive: verifiedPremium,
               trialDaysLeft,
               isTrial,
+              accessApp,
+              canAccessInsights,
+              historyDaysLimit,
+              chatLimit,
               subscriptionReason,
               themeMode: data.themeMode || "light",
               notificationsEnabled: data.notificationsEnabled ?? true,
@@ -291,7 +307,7 @@ function AppContent({
           }
 
           // Fetch user's journal entries from Supabase Proxy
-          const entriesRes = await fetch(`/api/journal-entries/${user.id}`);
+          const entriesRes = await fetch(`/api/journal-entries/${user.id}?email=${encodeURIComponent(user.email || "")}`);
           if (entriesRes.ok) {
             const entriesData = await entriesRes.json();
             if (Array.isArray(entriesData)) {
@@ -782,14 +798,14 @@ function AppContent({
               </button>
             </div>
           </div>
-        ) : (user && !isOfflineSandbox && isOnboarded && (!userProfile || !userProfile.premiumActive)) ? (
-          /* HARD PAYWALL PAYMENT CONNECTION TAKE-OVER */
+        ) : (user && !isOfflineSandbox && isOnboarded && userProfile && userProfile.accessApp === false) ? (
+          /* PAYWALL PAYMENT CONNECTION TAKE-OVER ONLY AFTER 3-DAY TRIAL EXPIRES */
           <DodoPaywallView 
             user={user} 
             userProfile={userProfile} 
             onPaymentSuccess={async () => {
               try {
-                const subRes = await fetch(`/api/verify-subscription?userId=${user.id}`);
+                const subRes = await fetch(`/api/verify-subscription?userId=${user.id}&email=${encodeURIComponent(user.email || "")}`);
                 if (subRes.ok) {
                   const subData = await subRes.json();
                   if (userProfile) {
@@ -798,6 +814,8 @@ function AppContent({
                       premiumActive: subData.premiumActive,
                       trialDaysLeft: subData.trialDaysLeft,
                       isTrial: subData.isTrial,
+                      accessApp: subData.accessApp ?? true,
+                      canAccessInsights: subData.canAccessInsights ?? true,
                       subscriptionReason: subData.reason
                     });
                   }
@@ -913,7 +931,12 @@ function AppContent({
                 </div>
 
                 <div className="border-t border-soft-green/20 pt-6">
-                  <AnalyticsView entries={entries} />
+                  <AnalyticsView 
+                    entries={entries} 
+                    isTrial={userProfile?.isTrial}
+                    canAccessInsights={userProfile?.canAccessInsights ?? (!userProfile?.isTrial)}
+                    onOpenUpgrade={() => setActiveView("profile")}
+                  />
                 </div>
               </div>
             )}

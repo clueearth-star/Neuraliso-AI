@@ -110,6 +110,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
   const [uiModeState, setUiModeState] = useState<string>("FLOATING_HEAD");
   const [dailyCount, setDailyCount] = useState<number | null>(null);
   const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  const [isTrial, setIsTrial] = useState<boolean>(false);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +122,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
           const data = await response.json();
           setDailyCount(data.daily_message_count);
           setDailyLimit(data.limit);
+          setIsTrial(data.isTrial ?? false);
+          setTrialDaysLeft(data.trialDaysLeft ?? null);
         }
       } catch (err) {
         console.error("Failed to fetch limits:", err);
@@ -687,9 +691,16 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
             <h3 className="font-sans font-bold text-dark-text text-sm">Neuraliso AI Companion</h3>
             <p className="text-[10px] text-muted-text">Powered by Gemini CBT Guard</p>
             {dailyLimit !== null && dailyCount !== null && (
-              <p className="text-[9px] text-indigo-600 font-semibold mt-0.5 font-mono">
-                {Math.max(0, dailyLimit - dailyCount)} of {dailyLimit} messages left today
-              </p>
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                {isTrial && trialDaysLeft !== null && (
+                  <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full w-fit">
+                    🎁 3-Day Trial: {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} remaining
+                  </span>
+                )}
+                <p className="text-[9px] text-indigo-600 font-semibold font-mono">
+                  {Math.max(0, dailyLimit - dailyCount)} of {dailyLimit} messages left today (resets at midnight)
+                </p>
+              </div>
             )}
           </div>
         </div>

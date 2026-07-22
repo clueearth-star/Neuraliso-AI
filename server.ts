@@ -79,20 +79,24 @@ const fallbackReviews: any[] = [];
 
 interface UserLimitState {
   isPremium: boolean;
+  isTrial: boolean;
+  trialDaysLeft: number | null;
+  accessApp: boolean;
   daily_message_count: number;
   last_message_date: string;
   limit: number;
 }
 
-async function getUserChatLimitState(userId: string): Promise<UserLimitState> {
+async function getUserChatLimitState(userId: string, userEmail?: string): Promise<UserLimitState> {
   const todayStr = new Date().toISOString().split("T")[0]; // UTC date e.g. "2026-07-19"
   
-  let isPremium = false;
+  const subState = await getUserSubscriptionState(userId, userEmail);
+  
   let dailyCount = 0;
   let lastDate = todayStr;
   
   if (userId && userId !== "guest" && userId !== "offline") {
-    // 1. Try to get from database
+    // 1. Try to get message count from database
     try {
       const baseUrl = getSupabaseUrl();
       const apiKey = getSupabaseKey();
@@ -110,7 +114,6 @@ async function getUserChatLimitState(userId: string): Promise<UserLimitState> {
           const checkData = await checkRes.json();
           if (Array.isArray(checkData) && checkData.length > 0) {
             const dbUser = checkData[0];
-            isPremium = dbUser.premium_active ?? false;
             dailyCount = dbUser.daily_message_count ?? 0;
             lastDate = dbUser.last_message_date || "";
           }
@@ -127,31 +130,36 @@ async function getUserChatLimitState(userId: string): Promise<UserLimitState> {
     fallbackUsers[key] = { id: key };
   }
   
-  if (isPremium) {
-    fallbackUsers[key].premium_active = true;
-  } else if (fallbackUsers[key].premium_active !== undefined) {
-    isPremium = fallbackUsers[key].premium_active;
-  }
-  
   if (fallbackUsers[key].daily_message_count !== undefined && !dailyCount) {
     dailyCount = fallbackUsers[key].daily_message_count;
     lastDate = fallbackUsers[key].last_message_date || todayStr;
   }
   
-  // 3. Reset count if date has changed
+  // 3. Reset count if date has changed (midnight reset)
   if (lastDate !== todayStr) {
     dailyCount = 0;
     lastDate = todayStr;
     
-    // Save the reset state in memory
     fallbackUsers[key].daily_message_count = 0;
     fallbackUsers[key].last_message_date = todayStr;
   }
   
-  const limit = isPremium ? 150 : 15;
+  let limit = 20;
+  if (!subState.accessApp) {
+    limit = 0;
+  } else if (subState.isPaid || subState.reason === "vip_access") {
+    limit = 150;
+  } else if (subState.isTrial) {
+    limit = 20;
+  } else {
+    limit = 0;
+  }
   
   return {
-    isPremium,
+    isPremium: subState.isPaid || subState.reason === "vip_access",
+    isTrial: subState.isTrial,
+    trialDaysLeft: subState.trialDaysLeft,
+    accessApp: subState.accessApp,
     daily_message_count: dailyCount,
     last_message_date: lastDate,
     limit
@@ -516,7 +524,7 @@ async function callAILab(systemInstruction: string, promptText: string, history:
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: contentsList,
       config
     });
@@ -602,12 +610,16 @@ app.get("/api/supabase-config", (req, res) => {
 app.get("/api/chat/limits", async (req, res) => {
   try {
     const userId = req.query.userId as string;
+    const email = req.query.email as string | undefined;
     const resolvedUserId = userId || "guest";
-    const limitState = await getUserChatLimitState(resolvedUserId);
+    const limitState = await getUserChatLimitState(resolvedUserId, email);
     res.json({
       daily_message_count: limitState.daily_message_count,
       limit: limitState.limit,
-      isPremium: limitState.isPremium
+      isPremium: limitState.isPremium,
+      isTrial: limitState.isTrial,
+      trialDaysLeft: limitState.trialDaysLeft,
+      accessApp: limitState.accessApp
     });
   } catch (err: any) {
     console.error("[GET /api/chat/limits] Error:", err.message || err);
@@ -618,7 +630,15 @@ app.get("/api/chat/limits", async (req, res) => {
 // 1. API: Chat endpoint
 app.post("/api/chat", async (req, res) => {
   let resolvedUserId = "guest";
-  let limitState: UserLimitState = { isPremium: false, daily_message_count: 0, last_message_date: "", limit: 15 };
+  let limitState: UserLimitState = { 
+    isPremium: false, 
+    daily_message_count: 0, 
+    last_message_date: "", 
+    limit: 20, 
+    isTrial: true, 
+    trialDaysLeft: 3, 
+    accessApp: true 
+  };
   try {
     const { message, history, userId } = req.body;
     resolvedUserId = userId || "guest";
@@ -628,11 +648,25 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // Daily Message Limit Check
-    limitState = await getUserChatLimitState(resolvedUserId);
-    if (limitState.daily_message_count >= limitState.limit) {
+    const userEmail = req.body.email;
+    limitState = await getUserChatLimitState(resolvedUserId, userEmail);
+    
+    if (!limitState.accessApp) {
       return res.json({
         limitReached: true,
-        reply: "You've reached your daily message limit. Upgrade to Premium for more, or come back tomorrow.",
+        reply: "Your 3-day free trial has expired. Please upgrade to Premium to continue chatting with Serene AI.",
+        daily_message_count: limitState.daily_message_count,
+        limit: 0
+      });
+    }
+
+    if (limitState.daily_message_count >= limitState.limit) {
+      const msgReply = limitState.isTrial 
+        ? "You've reached your 3-day trial limit of 20 chat messages today. Upgrade to Premium for 150 messages/day or return tomorrow!"
+        : "You've reached your daily message limit. Please return tomorrow or contact support.";
+      return res.json({
+        limitReached: true,
+        reply: msgReply,
         daily_message_count: limitState.daily_message_count,
         limit: limitState.limit
       });
@@ -1209,22 +1243,22 @@ app.post("/api/reviews/notify", async (req, res) => {
 /**
  * Helper to update user subscription details securely both in-memory and in Supabase
  */
-async function updateUserSubscription(userId: string, data: {
+async function updateUserSubscription(userId: string, data: Partial<{
   premium_active: boolean;
   trial_start_date: string;
   trial_end_date: string;
   dodo_subscription_id: string;
   dodo_payment_status: string;
-}) {
+}>) {
   if (!fallbackUsers[userId]) {
     fallbackUsers[userId] = { id: userId };
   }
   
-  fallbackUsers[userId].premium_active = data.premium_active;
-  fallbackUsers[userId].trial_start_date = data.trial_start_date;
-  fallbackUsers[userId].trial_end_date = data.trial_end_date;
-  fallbackUsers[userId].dodo_subscription_id = data.dodo_subscription_id;
-  fallbackUsers[userId].dodo_payment_status = data.dodo_payment_status;
+  if (data.premium_active !== undefined) fallbackUsers[userId].premium_active = data.premium_active;
+  if (data.trial_start_date !== undefined) fallbackUsers[userId].trial_start_date = data.trial_start_date;
+  if (data.trial_end_date !== undefined) fallbackUsers[userId].trial_end_date = data.trial_end_date;
+  if (data.dodo_subscription_id !== undefined) fallbackUsers[userId].dodo_subscription_id = data.dodo_subscription_id;
+  if (data.dodo_payment_status !== undefined) fallbackUsers[userId].dodo_payment_status = data.dodo_payment_status;
 
   try {
     const baseUrl = getSupabaseUrl();
@@ -1315,13 +1349,37 @@ async function findUserIdByEmail(email: string): Promise<string | null> {
   return null;
 }
 
+export interface DetailedSubscriptionState {
+  premiumActive: boolean;
+  isPaid: boolean;
+  isTrial: boolean;
+  trialDaysLeft: number | null;
+  chatLimit: number;
+  canAccessInsights: boolean;
+  historyDaysLimit: number | null;
+  accessApp: boolean;
+  reason: string;
+}
+
 /**
  * Checks detailed subscription, trial, and email exception state for a user securely server-side.
  */
-async function getUserSubscriptionState(userId: string): Promise<{ premiumActive: boolean; trialDaysLeft: number | null; isTrial: boolean; reason?: string }> {
-  if (!userId) return { premiumActive: false, trialDaysLeft: null, isTrial: false };
+async function getUserSubscriptionState(userId: string, optionalEmail?: string): Promise<DetailedSubscriptionState> {
+  if (!userId || userId === "offline") {
+    return {
+      premiumActive: false,
+      isPaid: false,
+      isTrial: true,
+      trialDaysLeft: 3,
+      chatLimit: 20,
+      canAccessInsights: false,
+      historyDaysLimit: 7,
+      accessApp: true,
+      reason: "offline_sandbox"
+    };
+  }
 
-  let email = "";
+  let email = optionalEmail || "";
   let premiumActive = false;
   let trialStartDate: string | null = null;
   let trialEndDate: string | null = null;
@@ -1331,7 +1389,7 @@ async function getUserSubscriptionState(userId: string): Promise<{ premiumActive
   // 1. Check local cache
   const cached = fallbackUsers[userId];
   if (cached) {
-    email = cached.email || "";
+    email = email || cached.email || "";
     premiumActive = cached.premium_active ?? false;
     trialStartDate = cached.trial_start_date || null;
     trialEndDate = cached.trial_end_date || null;
@@ -1380,35 +1438,85 @@ async function getUserSubscriptionState(userId: string): Promise<{ premiumActive
     console.warn("[getUserSubscriptionState Supabase Fail]:", e);
   }
 
-  // 3. Exception for clueearth@gmail.com
+  // 3. Exception for clueearth@gmail.com (Requirement 6)
   if (email && email.toLowerCase().trim() === "clueearth@gmail.com") {
-    return { premiumActive: true, trialDaysLeft: null, isTrial: false };
+    return {
+      premiumActive: true,
+      isPaid: true,
+      isTrial: false,
+      trialDaysLeft: null,
+      chatLimit: 150,
+      canAccessInsights: true,
+      historyDaysLimit: null,
+      accessApp: true,
+      reason: "vip_access"
+    };
   }
 
-  // 4. Check payment connection
-  if (!premiumActive) {
-    return { premiumActive: false, trialDaysLeft: null, isTrial: false, reason: "payment_not_connected" };
+  // 4. Check paid subscription status (Requirement 5)
+  const isPaid = premiumActive && (dodoPaymentStatus === "active" || dodoPaymentStatus === "succeeded" || dodoPaymentStatus === "completed" || !dodoPaymentStatus);
+  if (isPaid && dodoSubscriptionId) {
+    return {
+      premiumActive: true,
+      isPaid: true,
+      isTrial: false,
+      trialDaysLeft: null,
+      chatLimit: 150,
+      canAccessInsights: true,
+      historyDaysLimit: null,
+      accessApp: true,
+      reason: "active_subscription"
+    };
   }
 
-  // 5. Evaluate trial timeline
-  if (trialStartDate && trialEndDate) {
+  // 5. Evaluate or initialize 3-Day Free Trial (Requirement 1 & 2)
+  if (!trialStartDate || !trialEndDate) {
     const now = new Date();
-    const end = new Date(trialEndDate);
-    const diffTime = end.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    trialStartDate = now.toISOString();
+    const end = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 days / 72 hours
+    trialEndDate = end.toISOString();
 
-    if (diffDays > 0) {
-      return { premiumActive: true, trialDaysLeft: diffDays, isTrial: true };
-    } else {
-      if (dodoPaymentStatus === "active" || dodoPaymentStatus === "succeeded" || dodoPaymentStatus === "completed" || !dodoPaymentStatus) {
-        return { premiumActive: true, trialDaysLeft: 0, isTrial: false };
-      } else {
-        return { premiumActive: false, trialDaysLeft: 0, isTrial: false, reason: "trial_expired_payment_failed" };
-      }
-    }
+    if (!fallbackUsers[userId]) fallbackUsers[userId] = { id: userId };
+    fallbackUsers[userId].trial_start_date = trialStartDate;
+    fallbackUsers[userId].trial_end_date = trialEndDate;
+
+    updateUserSubscription(userId, {
+      trial_start_date: trialStartDate,
+      trial_end_date: trialEndDate
+    }).catch(err => console.warn("Failed to persist trial dates:", err));
   }
 
-  return { premiumActive: true, trialDaysLeft: null, isTrial: false };
+  const now = new Date();
+  const end = new Date(trialEndDate);
+  const diffTime = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffTime > 0) {
+    return {
+      premiumActive: false,
+      isPaid: false,
+      isTrial: true,
+      trialDaysLeft: Math.max(1, diffDays),
+      chatLimit: 20, // 20 chat msgs per day during trial
+      canAccessInsights: false, // Pattern insights preview locked
+      historyDaysLimit: 7, // Last 7 days visible
+      accessApp: true, // Main app accessible
+      reason: "trial_active"
+    };
+  } else {
+    // Trial EXPIRED! Block main app access (Requirement 4)
+    return {
+      premiumActive: false,
+      isPaid: false,
+      isTrial: false,
+      trialDaysLeft: 0,
+      chatLimit: 0,
+      canAccessInsights: false,
+      historyDaysLimit: 0,
+      accessApp: false,
+      reason: "trial_expired_payment_required"
+    };
+  }
 }
 
 /**
@@ -1417,7 +1525,7 @@ async function getUserSubscriptionState(userId: string): Promise<{ premiumActive
  */
 async function isUserPremium(userId: string): Promise<boolean> {
   const state = await getUserSubscriptionState(userId);
-  return state.premiumActive;
+  return state.isPaid || state.reason === "vip_access";
 }
 
 // API to query subscription pricing and plan configurations securely from env vars
@@ -1434,15 +1542,21 @@ app.get("/api/subscription-config", (req, res) => {
 app.get("/api/verify-subscription", async (req, res) => {
   try {
     const userId = req.query.userId as string;
+    const email = req.query.email as string | undefined;
     if (!userId) {
       return res.status(400).json({ error: "Missing userId query parameter" });
     }
-    const state = await getUserSubscriptionState(userId);
+    const state = await getUserSubscriptionState(userId, email);
     return res.json({ 
       userId, 
-      premiumActive: state.premiumActive,
-      trialDaysLeft: state.trialDaysLeft,
+      premiumActive: state.isPaid || state.reason === "vip_access",
+      isPaid: state.isPaid,
       isTrial: state.isTrial,
+      trialDaysLeft: state.trialDaysLeft,
+      chatLimit: state.chatLimit,
+      canAccessInsights: state.canAccessInsights,
+      historyDaysLimit: state.historyDaysLimit,
+      accessApp: state.accessApp,
       reason: state.reason
     });
   } catch (err: any) {
@@ -1860,6 +1974,9 @@ app.post("/api/user-profile", async (req, res) => {
 app.get("/api/journal-entries/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    const email = req.query.email as string | undefined;
+    const subState = await getUserSubscriptionState(userId, email);
+
     const baseUrl = getSupabaseUrl();
     const targetUrl = `${baseUrl}/rest/v1/entries?user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc`;
     const apiKey = getSupabaseKey();
@@ -1874,29 +1991,45 @@ app.get("/api/journal-entries/:userId", async (req, res) => {
         "Content-Type": "application/json"
       }
     });
+    
+    let rawList: any[] = [];
     if (!response.ok) {
       const text = await response.text();
       if (text.includes("PGRST205") || response.status === 404) {
         console.warn(`[Proxy journal-entries GET] Table 'entries' not found. Falling back to local memory.`);
-        const list = fallbackEntries[userId] || [];
-        return res.json(list);
+        rawList = fallbackEntries[userId] || [];
+      } else {
+        throw new Error(`Supabase entries query failed with status ${response.status}: ${text}`);
       }
-      throw new Error(`Supabase entries query failed with status ${response.status}: ${text}`);
+    } else {
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        rawList = data.map((record: any) => {
+          return {
+            id: record.id,
+            date: record.date || record.created_at?.split("T")[0],
+            mood: record.mood,
+            stress: record.stress_level ?? 5,
+            energy: record.energy_level ?? 5,
+            note: record.comment || "",
+            actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : []
+          };
+        });
+      }
     }
-    const data = await response.json();
-    const parsedEntries = Array.isArray(data) ? data.map((record: any) => {
-      return {
-        id: record.id,
-        date: record.date || record.created_at?.split("T")[0],
-        mood: record.mood,
-        stress: record.stress_level ?? 5,
-        energy: record.energy_level ?? 5,
-        note: record.comment || "",
-        actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : []
-      };
-    }) : [];
 
-    return res.json(parsedEntries);
+    // Filter entries if in trial (Requirement 2 & 7: only last 7 days visible during trial)
+    if (subState.isTrial && subState.historyDaysLimit === 7) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      rawList = rawList.filter(e => {
+        if (!e.date) return true;
+        const entryDate = new Date(e.date);
+        return entryDate >= sevenDaysAgo;
+      });
+    }
+
+    return res.json(rawList);
   } catch (error: any) {
     console.error("[Proxy journal-entries GET] Error:", error.message || error);
     return res.status(500).json({ error: error.message || "Failed to retrieve journal entries securely." });

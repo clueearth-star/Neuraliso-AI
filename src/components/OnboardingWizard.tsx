@@ -121,6 +121,42 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Debug state for signup / auth submission
+  const [signupDebug, setSignupDebug] = useState<{
+    submitHandlerCalled: "yes" | "no";
+    lastTappedTime: string | null;
+    emailAtTap: string;
+    passwordAtTap: string;
+    nameAtTap: string;
+    validationError: string | null;
+    buttonDisabled: boolean;
+    disabledReason: string;
+    supabaseResult: string | null;
+  }>({
+    submitHandlerCalled: "no",
+    lastTappedTime: null,
+    emailAtTap: "",
+    passwordAtTap: "",
+    nameAtTap: "",
+    validationError: null,
+    buttonDisabled: false,
+    disabledReason: "None (button is enabled)",
+    supabaseResult: null,
+  });
+
+  // Keep buttonDisabled and disabledReason updated in real time
+  useEffect(() => {
+    let reason = "None (button is enabled)";
+    if (authLoading) {
+      reason = "authLoading is true (submission in progress)";
+    }
+    setSignupDebug(prev => ({
+      ...prev,
+      buttonDisabled: authLoading,
+      disabledReason: reason
+    }));
+  }, [authLoading]);
+
   const handleGoogleSignIn = async () => {
     setAuthLoading(true);
     setAuthError(null);
@@ -141,12 +177,36 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput || !passwordInput) {
-      setAuthError("Please fill out all fields.");
+  const handleEmailSignIn = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const now = new Date().toLocaleTimeString();
+    
+    let valErr: string | null = null;
+    if (!emailInput || !emailInput.trim()) {
+      valErr = "Email field is required";
+    } else if (!emailInput.includes("@") || !emailInput.includes(".")) {
+      valErr = "Invalid email format (must contain @ and domain)";
+    } else if (!passwordInput) {
+      valErr = "Password field is required";
+    }
+
+    setSignupDebug({
+      submitHandlerCalled: "yes",
+      lastTappedTime: now,
+      emailAtTap: emailInput || "(empty)",
+      passwordAtTap: passwordInput ? `•••••••• (${passwordInput.length} chars)` : "(empty)",
+      nameAtTap: nameInput || "(n/a for login)",
+      validationError: valErr,
+      buttonDisabled: authLoading,
+      disabledReason: authLoading ? "authLoading is true" : "None (button is enabled)",
+      supabaseResult: valErr ? `Validation check failed: ${valErr}` : "Calling login..."
+    });
+
+    if (valErr) {
+      setAuthError(valErr);
       return;
     }
+
     setAuthLoading(true);
     setAuthError(null);
     try {
@@ -155,29 +215,87 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       } else {
         await firebaseLoginWithEmail(emailInput, passwordInput);
       }
+      setSignupDebug(prev => ({
+        ...prev,
+        supabaseResult: "Success: Logged in successfully!"
+      }));
     } catch (err: any) {
-      setAuthError(err.message || "Failed to log in. Please check your credentials.");
+      const errMsg = err.message || String(err);
+      setAuthError(errMsg);
+      setSignupDebug(prev => ({
+        ...prev,
+        supabaseResult: `Error: ${errMsg}`
+      }));
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleEmailRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput || !passwordInput || !nameInput) {
-      setAuthError("Please fill out all fields.");
+  const handleEmailRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const now = new Date().toLocaleTimeString();
+
+    // Capture values at exact moment of tap
+    const currName = nameInput;
+    const currEmail = emailInput;
+    const currPass = passwordInput;
+
+    console.log("[Signup Debug] Submit handler called at", now, "with values:", { currName, currEmail, currPass: currPass ? "***" : "(empty)" });
+
+    // Calculate explicit validation errors
+    let valErr: string | null = null;
+    if (!currName || !currName.trim()) {
+      valErr = "Name field is required";
+    } else if (!currEmail || !currEmail.trim()) {
+      valErr = "Email field is required";
+    } else if (!currEmail.includes("@") || !currEmail.includes(".")) {
+      valErr = "Invalid email format (must contain @ and domain)";
+    } else if (!currPass) {
+      valErr = "Password field is required";
+    } else if (currPass.length < 6) {
+      valErr = "Password too short (must be at least 6 characters)";
+    }
+
+    setSignupDebug({
+      submitHandlerCalled: "yes",
+      lastTappedTime: now,
+      emailAtTap: currEmail || "(empty)",
+      passwordAtTap: currPass ? `•••••••• (${currPass.length} chars)` : "(empty)",
+      nameAtTap: currName || "(empty)",
+      validationError: valErr,
+      buttonDisabled: authLoading,
+      disabledReason: authLoading ? "authLoading is true" : "None (button is enabled)",
+      supabaseResult: valErr ? `Validation blocked call to supabase.auth.signUp(): ${valErr}` : "Calling supabase.auth.signUp()..."
+    });
+
+    if (valErr) {
+      setAuthError(valErr);
       return;
     }
+
     setAuthLoading(true);
     setAuthError(null);
+
     try {
+      let registeredUser: any = null;
       if (isAuth0Active && registerWithEmail) {
-        await registerWithEmail(emailInput, passwordInput, nameInput);
+        registeredUser = await registerWithEmail(currEmail, currPass, currName);
       } else {
-        await firebaseRegisterWithEmail(emailInput, passwordInput, nameInput);
+        registeredUser = await firebaseRegisterWithEmail(currEmail, currPass, currName);
       }
+
+      const successText = `Success: Registered account successfully! (User ID: ${registeredUser?.id || registeredUser?.uid || "created"}, Email: ${registeredUser?.email || currEmail})`;
+      setSignupDebug(prev => ({
+        ...prev,
+        supabaseResult: successText
+      }));
     } catch (err: any) {
-      setAuthError(err.message || "Failed to register account. Password must be at least 6 characters.");
+      const errDetail = err.message || err.error_description || String(err);
+      setAuthError(errDetail);
+      setSignupDebug(prev => ({
+        ...prev,
+        supabaseResult: `Error from supabase.auth.signUp(): ${errDetail}`
+      }));
     } finally {
       setAuthLoading(false);
     }
@@ -664,7 +782,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     )}
 
                     {authMode === "email_login" && (
-                      <form onSubmit={handleEmailSignIn} className="space-y-3.5 text-left">
+                      <form noValidate onSubmit={handleEmailSignIn} className="space-y-3.5 text-left">
                         <div className="space-y-1">
                           <label className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider block">Email Address</label>
                           <input
@@ -698,6 +816,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           <button
                             type="submit"
                             disabled={authLoading}
+                            onClick={() => handleEmailSignIn()}
                             className="w-2/3 bg-deep-sage hover:bg-primary-sage text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all text-center flex items-center justify-center gap-1.5"
                           >
                             <span>{authLoading ? "Verifying..." : "Confirm Login 🔑"}</span>
@@ -707,7 +826,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     )}
 
                     {authMode === "email_register" && (
-                      <form onSubmit={handleEmailRegister} className="space-y-3.5 text-left">
+                      <form noValidate onSubmit={handleEmailRegister} className="space-y-3.5 text-left">
                         <div className="space-y-1">
                           <label className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider block">Your Name</label>
                           <input
@@ -752,12 +871,83 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           <button
                             type="submit"
                             disabled={authLoading}
+                            onClick={() => {
+                              console.log("[Signup Debug] Button onClick triggered");
+                              handleEmailRegister();
+                            }}
                             className="w-2/3 bg-deep-sage hover:bg-primary-sage text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all text-center flex items-center justify-center gap-1.5"
                           >
                             <span>{authLoading ? "Creating..." : "Create Account 📝"}</span>
                           </button>
                         </div>
                       </form>
+                    )}
+
+                    {/* ON-SCREEN SIGNUP DEBUG OUTPUT BANNER */}
+                    {(authMode === "email_register" || authMode === "email_login") && (
+                      <div className="w-full bg-slate-900 text-slate-100 p-3.5 rounded-2xl border border-amber-400/60 shadow-xl text-left space-y-2 text-[11px] font-mono my-3">
+                        <div className="flex items-center justify-between border-b border-slate-700 pb-1.5">
+                          <span className="font-bold text-amber-400 flex items-center gap-1.5 uppercase text-[10px]">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                            🛠️ SIGNUP REAL-TIME DEBUG BANNER
+                          </span>
+                          <span className="text-[9px] text-slate-400">
+                            {signupDebug.lastTappedTime ? `Tapped: ${signupDebug.lastTappedTime}` : "Awaiting tap"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 leading-snug">
+                          <div>
+                            <span className="text-slate-400">1. Submit handler called:</span>{" "}
+                            <span className={`font-bold ${signupDebug.submitHandlerCalled === "yes" ? "text-emerald-400" : "text-amber-300"}`}>
+                              {signupDebug.submitHandlerCalled === "yes" ? "YES" : "NO"} {signupDebug.lastTappedTime ? `(at ${signupDebug.lastTappedTime})` : ""}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-slate-400">2. Field values at moment of tap:</span>
+                            <div className="pl-3 text-[10px] space-y-0.5 text-slate-300 border-l border-slate-700 my-1">
+                              <div>• Name: <span className="text-cyan-300 font-bold">{signupDebug.nameAtTap || "(not tapped yet)"}</span></div>
+                              <div>• Email: <span className="text-cyan-300 font-bold">{signupDebug.emailAtTap || "(not tapped yet)"}</span></div>
+                              <div>• Password: <span className="text-cyan-300 font-bold">{signupDebug.passwordAtTap || "(not tapped yet)"}</span></div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-slate-400">3. Validation error preventing submission:</span>{" "}
+                            {signupDebug.validationError ? (
+                              <span className="text-red-400 font-bold bg-red-950/80 px-1.5 py-0.5 rounded border border-red-800/80 inline-block mt-0.5">
+                                ⚠️ {signupDebug.validationError}
+                              </span>
+                            ) : (
+                              <span className="text-emerald-400 font-bold">
+                                {signupDebug.submitHandlerCalled === "yes" ? "None (validation passed)" : "None"}
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <span className="text-slate-400">4. Button status & reason:</span>{" "}
+                            <span className={`font-bold ${signupDebug.buttonDisabled ? "text-red-400" : "text-emerald-400"}`}>
+                              {signupDebug.buttonDisabled ? "DISABLED" : "ENABLED"}
+                            </span>{" "}
+                            <span className="text-slate-400">({signupDebug.disabledReason})</span>
+                          </div>
+
+                          <div>
+                            <span className="text-slate-400">5. supabase.auth.signUp() response / error:</span>
+                            <div className={`mt-1 p-2 rounded text-[10px] break-all border font-sans ${
+                              !signupDebug.supabaseResult
+                                ? "bg-slate-800/80 text-slate-400 border-slate-700"
+                                : signupDebug.supabaseResult.startsWith("Success")
+                                ? "bg-emerald-950/90 text-emerald-300 border-emerald-700 font-mono"
+                                : "bg-red-950/90 text-red-300 border-red-700 font-mono"
+                            }`}>
+                              {signupDebug.supabaseResult || "No response yet (tap Create Account to execute submission)"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (

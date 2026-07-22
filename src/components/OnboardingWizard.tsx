@@ -183,25 +183,35 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (e) e.preventDefault();
     const now = new Date().toLocaleTimeString();
     
+    const currEmail = emailInput;
+    const currPass = passwordInput;
+
+    console.log("[Login Debug] Submit handler called at", now, "with exact values:", {
+      exactEmail: JSON.stringify(currEmail),
+      exactPassword: JSON.stringify(currPass),
+      emailLength: currEmail?.length,
+      passwordLength: currPass?.length
+    });
+
     let valErr: string | null = null;
-    if (!emailInput || !emailInput.trim()) {
+    if (!currEmail || !currEmail.trim()) {
       valErr = "Email field is required";
-    } else if (!emailInput.includes("@") || !emailInput.includes(".")) {
+    } else if (!currEmail.includes("@") || !currEmail.includes(".")) {
       valErr = "Invalid email format (must contain @ and domain)";
-    } else if (!passwordInput) {
+    } else if (!currPass) {
       valErr = "Password field is required";
     }
 
     setSignupDebug({
       submitHandlerCalled: "yes",
       lastTappedTime: now,
-      emailAtTap: emailInput || "(empty)",
-      passwordAtTap: passwordInput ? `•••••••• (${passwordInput.length} chars)` : "(empty)",
+      emailAtTap: currEmail ? JSON.stringify(currEmail) : "(empty)",
+      passwordAtTap: currPass ? JSON.stringify(currPass) : "(empty)",
       nameAtTap: nameInput || "(n/a for login)",
       validationError: valErr,
       buttonDisabled: authLoading,
       disabledReason: authLoading ? "authLoading is true" : "None (button is enabled)",
-      supabaseResult: valErr ? `Validation check failed: ${valErr}` : "Calling login..."
+      supabaseResult: valErr ? `Validation check failed: ${valErr}` : `Calling supabase.auth.signInWithPassword() with email=${JSON.stringify(currEmail.trim())}...`
     });
 
     if (valErr) {
@@ -213,20 +223,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setAuthError(null);
     try {
       if (isAuth0Active && loginWithEmail) {
-        await loginWithEmail(emailInput, passwordInput);
+        await loginWithEmail(currEmail, currPass);
       } else {
-        await firebaseLoginWithEmail(emailInput, passwordInput);
+        await firebaseLoginWithEmail(currEmail, currPass);
       }
       setSignupDebug(prev => ({
         ...prev,
-        supabaseResult: "Success: Logged in successfully!"
+        supabaseResult: `Success: Logged in successfully with email=${JSON.stringify(currEmail.trim())}!`
       }));
     } catch (err: any) {
       const errMsg = err.message || String(err);
       setAuthError(errMsg);
       setSignupDebug(prev => ({
         ...prev,
-        supabaseResult: `Error: ${errMsg}`
+        supabaseResult: `Error from signInWithPassword(): ${errMsg}`
       }));
     } finally {
       setAuthLoading(false);
@@ -261,13 +271,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setSignupDebug({
       submitHandlerCalled: "yes",
       lastTappedTime: now,
-      emailAtTap: currEmail || "(empty)",
-      passwordAtTap: currPass ? `•••••••• (${currPass.length} chars)` : "(empty)",
-      nameAtTap: currName || "(empty)",
+      emailAtTap: currEmail ? JSON.stringify(currEmail) : "(empty)",
+      passwordAtTap: currPass ? JSON.stringify(currPass) : "(empty)",
+      nameAtTap: currName ? JSON.stringify(currName) : "(empty)",
       validationError: valErr,
       buttonDisabled: authLoading,
       disabledReason: authLoading ? "authLoading is true" : "None (button is enabled)",
-      supabaseResult: valErr ? `Validation blocked call to supabase.auth.signUp(): ${valErr}` : "Calling supabase.auth.signUp()..."
+      supabaseResult: valErr ? `Validation blocked call to supabase.auth.signUp(): ${valErr}` : `Calling supabase.auth.signUp() with email=${JSON.stringify(currEmail.trim())}...`
     });
 
     if (valErr) {

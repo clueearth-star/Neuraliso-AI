@@ -1130,17 +1130,35 @@ function AppWithSupabase() {
   };
 
   const handleLoginWithEmail = async (email: string, pass: string) => {
+    const cleanEmail = email.trim();
+    console.log("[Supabase Auth Debug] Executing signInWithPassword:", {
+      rawEmail: JSON.stringify(email),
+      cleanEmail: JSON.stringify(cleanEmail),
+      rawPassword: JSON.stringify(pass),
+      passwordLength: pass?.length
+    });
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password: pass,
     });
-    if (error) throw error;
+    if (error) {
+      console.error("[Supabase Auth Debug] signInWithPassword error:", error);
+      throw error;
+    }
+    console.log("[Supabase Auth Debug] signInWithPassword success:", data);
     return data.user;
   };
 
   const handleRegisterWithEmail = async (email: string, pass: string, name: string) => {
+    const cleanEmail = email.trim();
+    console.log("[Supabase Auth Debug] Executing signUp:", {
+      rawEmail: JSON.stringify(email),
+      cleanEmail: JSON.stringify(cleanEmail),
+      rawPassword: JSON.stringify(pass),
+      name
+    });
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: cleanEmail,
       password: pass,
       options: {
         data: {

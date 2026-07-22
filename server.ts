@@ -1361,6 +1361,157 @@ export interface DetailedSubscriptionState {
   reason: string;
 }
 
+// In-memory fallback subscriptions map
+const fallbackSubscriptions: Record<string, {
+  id: string;
+  user_id: string;
+  dodo_subscription_id: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+}> = {};
+
+/**
+ * Checks if a user has a real, verified, active subscription row in the `subscriptions` table (or fallback cache)
+ */
+async function getUserSubscriptionFromDb(userId: string, email?: string): Promise<{
+  active: boolean;
+  subscriptionId?: string;
+  status?: string;
+  reason?: string;
+}> {
+  if (!userId) return { active: false };
+
+  // 1. VIP Exception for clueearth@gmail.com
+  if (email && email.toLowerCase().trim() === "clueearth@gmail.com") {
+    return {
+      active: true,
+      subscriptionId: "vip_clueearth_access",
+      status: "active",
+      reason: "vip_access"
+    };
+  }
+
+  // 2. Check local fallbackSubscriptions cache
+  const localSub = fallbackSubscriptions[userId];
+  if (localSub && (localSub.status === "active" || localSub.status === "succeeded" || localSub.status === "completed")) {
+    return {
+      active: true,
+      subscriptionId: localSub.dodo_subscription_id || localSub.id,
+      status: localSub.status,
+      reason: "active_subscription"
+    };
+  }
+
+  // 3. Query Supabase `subscriptions` table
+  try {
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (baseUrl && apiKey) {
+      const subUrl = `${baseUrl}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}&select=*`;
+      const res = await fetch(subUrl, {
+        method: "GET",
+        headers: {
+          "apikey": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          const activeRow = rows.find((r: any) => 
+            r.status === "active" || r.status === "succeeded" || r.status === "completed"
+          );
+          if (activeRow) {
+            fallbackSubscriptions[userId] = {
+              id: activeRow.id || activeRow.dodo_subscription_id,
+              user_id: userId,
+              dodo_subscription_id: activeRow.dodo_subscription_id || activeRow.id,
+              status: activeRow.status,
+              created_at: activeRow.created_at || new Date().toISOString()
+            };
+            return {
+              active: true,
+              subscriptionId: activeRow.dodo_subscription_id || activeRow.id,
+              status: activeRow.status,
+              reason: "active_subscription"
+            };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[getUserSubscriptionFromDb Supabase query fail]:", e);
+  }
+
+  return { active: false };
+}
+
+/**
+ * Saves or updates a verified subscription row in the `subscriptions` table and fallback cache
+ */
+async function recordSubscriptionInDb(userId: string, subscriptionId: string, status: string, email?: string): Promise<boolean> {
+  if (!userId || !subscriptionId) return false;
+
+  const now = new Date().toISOString();
+  const subObj = {
+    id: subscriptionId,
+    user_id: userId,
+    dodo_subscription_id: subscriptionId,
+    status: status,
+    created_at: now,
+    updated_at: now
+  };
+
+  // 1. Update in-memory fallback
+  fallbackSubscriptions[userId] = subObj;
+
+  // 2. Persist to Supabase `subscriptions` table
+  try {
+    const baseUrl = getSupabaseUrl();
+    const apiKey = getSupabaseKey();
+    if (baseUrl && apiKey) {
+      const subUrl = `${baseUrl}/rest/v1/subscriptions`;
+      const res = await fetch(subUrl, {
+        method: "POST",
+        headers: {
+          "apikey": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify(subObj)
+      });
+
+      if (!res.ok && res.status === 409) {
+        const patchUrl = `${baseUrl}/rest/v1/subscriptions?dodo_subscription_id=eq.${encodeURIComponent(subscriptionId)}`;
+        await fetch(patchUrl, {
+          method: "PATCH",
+          headers: {
+            "apikey": apiKey,
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ status, updated_at: now })
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[recordSubscriptionInDb Supabase insert fail]:", e);
+  }
+
+  // 3. Also update `users` table
+  await updateUserSubscription(userId, {
+    premium_active: status === "active" || status === "succeeded" || status === "completed",
+    dodo_subscription_id: subscriptionId,
+    dodo_payment_status: status
+  });
+
+  return true;
+}
+
 /**
  * Checks detailed subscription, trial, and email exception state for a user securely server-side.
  */
@@ -1380,24 +1531,18 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
   }
 
   let email = optionalEmail || "";
-  let premiumActive = false;
   let trialStartDate: string | null = null;
   let trialEndDate: string | null = null;
-  let dodoSubscriptionId = "";
-  let dodoPaymentStatus = "";
 
   // 1. Check local cache
   const cached = fallbackUsers[userId];
   if (cached) {
     email = email || cached.email || "";
-    premiumActive = cached.premium_active ?? false;
     trialStartDate = cached.trial_start_date || null;
     trialEndDate = cached.trial_end_date || null;
-    dodoSubscriptionId = cached.dodo_subscription_id || "";
-    dodoPaymentStatus = cached.dodo_payment_status || "";
   }
 
-  // 2. Fetch from Supabase
+  // 2. Fetch from Supabase users table
   try {
     const baseUrl = getSupabaseUrl();
     const apiKey = getSupabaseKey();
@@ -1416,21 +1561,15 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
         if (Array.isArray(checkData) && checkData.length > 0) {
           const record = checkData[0];
           email = record.email || email;
-          premiumActive = record.premium_active ?? premiumActive;
           trialStartDate = record.trial_start_date || trialStartDate;
           trialEndDate = record.trial_end_date || trialEndDate;
-          dodoSubscriptionId = record.dodo_subscription_id || dodoSubscriptionId;
-          dodoPaymentStatus = record.dodo_payment_status || dodoPaymentStatus;
 
           if (!fallbackUsers[userId]) {
             fallbackUsers[userId] = { id: userId };
           }
           fallbackUsers[userId].email = email;
-          fallbackUsers[userId].premium_active = premiumActive;
           fallbackUsers[userId].trial_start_date = trialStartDate;
           fallbackUsers[userId].trial_end_date = trialEndDate;
-          fallbackUsers[userId].dodo_subscription_id = dodoSubscriptionId;
-          fallbackUsers[userId].dodo_payment_status = dodoPaymentStatus;
         }
       }
     }
@@ -1438,7 +1577,7 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
     console.warn("[getUserSubscriptionState Supabase Fail]:", e);
   }
 
-  // 3. Exception for clueearth@gmail.com (Requirement 6)
+  // 3. Exception for clueearth@gmail.com
   if (email && email.toLowerCase().trim() === "clueearth@gmail.com") {
     return {
       premiumActive: true,
@@ -1453,9 +1592,9 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
     };
   }
 
-  // 4. Check paid subscription status (Requirement 5)
-  const isPaid = premiumActive && (dodoPaymentStatus === "active" || dodoPaymentStatus === "succeeded" || dodoPaymentStatus === "completed" || !dodoPaymentStatus);
-  if (isPaid && dodoSubscriptionId) {
+  // 4. Check paid subscription status from `subscriptions` table
+  const subResult = await getUserSubscriptionFromDb(userId, email);
+  if (subResult.active) {
     return {
       premiumActive: true,
       isPaid: true,
@@ -1465,11 +1604,11 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
       canAccessInsights: true,
       historyDaysLimit: null,
       accessApp: true,
-      reason: "active_subscription"
+      reason: subResult.reason || "active_subscription"
     };
   }
 
-  // 5. Evaluate or initialize 3-Day Free Trial (Requirement 1 & 2)
+  // 5. Evaluate or initialize 3-Day Free Trial
   if (!trialStartDate || !trialEndDate) {
     const now = new Date();
     trialStartDate = now.toISOString();
@@ -1497,14 +1636,14 @@ async function getUserSubscriptionState(userId: string, optionalEmail?: string):
       isPaid: false,
       isTrial: true,
       trialDaysLeft: Math.max(1, diffDays),
-      chatLimit: 20, // 20 chat msgs per day during trial
-      canAccessInsights: false, // Pattern insights preview locked
-      historyDaysLimit: 7, // Last 7 days visible
-      accessApp: true, // Main app accessible
+      chatLimit: 20,
+      canAccessInsights: false,
+      historyDaysLimit: 7,
+      accessApp: true,
       reason: "trial_active"
     };
   } else {
-    // Trial EXPIRED! Block main app access (Requirement 4)
+    // Trial EXPIRED! Block main app access
     return {
       premiumActive: false,
       isPaid: false,
@@ -1617,13 +1756,7 @@ app.post("/api/verify-dodo-payment", express.json(), async (req, res) => {
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + 3);
 
-      await updateUserSubscription(userId, {
-        premium_active: true,
-        trial_start_date: trialStart.toISOString(),
-        trial_end_date: trialEnd.toISOString(),
-        dodo_subscription_id: subscriptionId,
-        dodo_payment_status: status
-      });
+      await recordSubscriptionInDb(userId, subscriptionId, status, customerEmail);
 
       return res.json({ success: true });
     } else {
@@ -1658,17 +1791,7 @@ app.post("/api/webhooks/dodo", express.json(), async (req, res) => {
 
         if (targetUserId) {
           console.log(`[Dodo Webhook] Processing event '${eventType}' for user ${targetUserId}. Status: ${status}`);
-          const trialStart = new Date();
-          const trialEnd = new Date();
-          trialEnd.setDate(trialEnd.getDate() + 3);
-
-          await updateUserSubscription(targetUserId, {
-            premium_active: status === "active" || status === "succeeded" || status === "completed" || eventType === "payment.succeeded",
-            trial_start_date: trialStart.toISOString(),
-            trial_end_date: trialEnd.toISOString(),
-            dodo_subscription_id: subscriptionId || "",
-            dodo_payment_status: status || "active"
-          });
+          await recordSubscriptionInDb(targetUserId, subscriptionId || ("sub_" + Date.now()), status || "active", customerEmail);
         } else {
           console.warn("[Dodo Webhook] No matching user found in database or cache for customer email / userId:", customerEmail, userId);
         }
@@ -1710,12 +1833,13 @@ app.get("/api/user-profile/:userId", async (req, res) => {
         console.warn(`[Proxy user-profile GET] Table 'users' not found. Falling back to local memory.`);
         const cached = fallbackUsers[userId];
         if (cached) {
+          const subState = await getUserSubscriptionState(userId, cached.email);
           return res.json({
             id: cached.id,
             userId: cached.id,
             email: cached.email || "",
             displayName: cached.display_name || "Neuraliso Seeker",
-            premiumActive: cached.premium_active ?? false,
+            premiumActive: subState.premiumActive,
             themeMode: cached.theme_mode || "light",
             notificationsEnabled: cached.notifications_enabled ?? true,
             completedOnboarding: cached.onboarding_completed ?? false,
@@ -1740,12 +1864,13 @@ app.get("/api/user-profile/:userId", async (req, res) => {
     const data = await response.json();
     if (Array.isArray(data) && data.length > 0) {
       const record = data[0];
+      const subState = await getUserSubscriptionState(userId, record.email);
       return res.json({
         id: record.id,
         userId: record.id,
         email: record.email || "",
         displayName: record.display_name || "Neuraliso Seeker",
-        premiumActive: record.premium_active ?? false,
+        premiumActive: subState.premiumActive,
         themeMode: record.theme_mode || "light",
         notificationsEnabled: record.notifications_enabled ?? true,
         completedOnboarding: record.onboarding_completed ?? false,
@@ -1803,12 +1928,15 @@ app.post("/api/user-profile", async (req, res) => {
       throw new Error("Supabase key not configured or decrypted");
     }
 
+    // Server-verified subscription status (client payload CANNOT override premium_active)
+    const serverSubState = await getUserSubscriptionState(userId, profile.email);
+
     // Map fields for columns
     const dbPayload = {
       id: userId,
       email: profile.email || "",
       display_name: displayName,
-      premium_active: profile.premiumActive ?? false,
+      premium_active: serverSubState.premiumActive,
       theme_mode: profile.themeMode || "light",
       notifications_enabled: profile.notificationsEnabled ?? true,
       onboarding_completed: profile.completedOnboarding ?? false,

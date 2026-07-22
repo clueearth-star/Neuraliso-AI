@@ -119,6 +119,7 @@ function AppContent({
     ageRange?: string;
     challenges?: string[];
     coping?: string[];
+    wellnessScore?: number;
     initialScore?: number;
     actionPlan?: any[];
     calmXP?: number;
@@ -244,7 +245,8 @@ function AppContent({
             }
 
             const hasCompletedOnboarding = data.completedOnboarding ?? false;
-            const dbStress = data.stressBaseline !== undefined ? data.stressBaseline : (data.initialScore ? Math.round((100 - data.initialScore) / 9) : 4);
+            const dbScore = data.wellnessScore !== undefined ? data.wellnessScore : (data.initialScore !== undefined ? data.initialScore : 0);
+            const dbStress = data.stressBaseline !== undefined ? data.stressBaseline : 4;
             setCurrentStress(dbStress);
             
             setUserProfile({
@@ -265,7 +267,8 @@ function AppContent({
               ageRange: data.ageRange,
               challenges: data.challenges,
               coping: data.coping,
-              initialScore: data.initialScore,
+              wellnessScore: dbScore,
+              initialScore: dbScore,
               actionPlan: data.actionPlan,
               calmXP: data.calmXP ?? 120,
               currentStreak: data.currentStreak ?? 5,
@@ -399,6 +402,7 @@ function AppContent({
         themeMode: "light" as const,
         notificationsEnabled: true,
       }),
+      wellnessScore: calculatedScore,
       initialScore: calculatedScore,
       stressBaseline: newStress,
     };
@@ -417,6 +421,7 @@ function AppContent({
             ...updatedProfile,
             id: user.id,
             userId: user.id,
+            wellnessScore: calculatedScore,
             initialScore: calculatedScore,
             stressBaseline: newStress
           })
@@ -452,6 +457,7 @@ function AppContent({
         themeMode: "light" as const,
         notificationsEnabled: true,
       }),
+      wellnessScore: calculatedScore,
       initialScore: calculatedScore,
       stressBaseline: newStress,
     };
@@ -493,6 +499,7 @@ function AppContent({
             ...updatedProfile,
             id: user.id,
             userId: user.id,
+            wellnessScore: calculatedScore,
             initialScore: calculatedScore,
             stressBaseline: newStress
           })
@@ -564,6 +571,7 @@ function AppContent({
       setCurrentStress(data.assessment.stress);
     }
 
+    const onboardingScore = data.wellnessScore !== undefined ? data.wellnessScore : (data.initialScore !== undefined ? data.initialScore : 0);
     // Save profile settings
     const profileData = {
       userId: user?.id || "OFFLINE-SANDBOX-USER",
@@ -575,7 +583,8 @@ function AppContent({
       ageRange: data.ageRange,
       challenges: data.challenges,
       coping: data.coping,
-      initialScore: data.initialScore,
+      wellnessScore: onboardingScore,
+      initialScore: onboardingScore,
       actionPlan: data.actionPlan,
       completedOnboarding: true,
       calmXP: userProfile?.calmXP ?? 120,
@@ -614,6 +623,7 @@ function AppContent({
         ageRange: profileData.ageRange,
         challenges: profileData.challenges,
         coping: profileData.coping,
+        wellnessScore: profileData.wellnessScore,
         initialScore: profileData.initialScore,
         actionPlan: profileData.actionPlan,
         calmXP: profileData.calmXP,
@@ -635,7 +645,8 @@ function AppContent({
         ageRange: data.ageRange,
         challenges: data.challenges,
         coping: data.coping,
-        initialScore: data.initialScore,
+        wellnessScore: onboardingScore,
+        initialScore: onboardingScore,
         actionPlan: data.actionPlan,
         calmXP: 120,
         currentStreak: 5,
@@ -851,7 +862,7 @@ function AppContent({
                 currentStress={currentStress}
                 setCurrentStress={handleUpdateStressAndScore}
                 userName={user ? user.displayName || userProfile?.displayName : (userProfile?.displayName || "Guest Seeker")}
-                wellnessScore={userProfile?.initialScore}
+                wellnessScore={userProfile?.wellnessScore !== undefined ? userProfile.wellnessScore : userProfile?.initialScore}
               />
             )}
 

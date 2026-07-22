@@ -4,6 +4,7 @@ import { PremiumBlueprintView } from "./PremiumBlueprintView";
 import { SystemDiagnostics } from "./SystemDiagnostics";
 import { Settings, Save, X, Edit3, Check, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
 import { PricingModal } from "./PricingModal";
+import { redirectToDodoCheckout } from "../lib/dodoCheckout";
 
 interface ProfileViewProps {
   entries: JournalEntry[];
@@ -98,22 +99,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const handleExecuteUpgrade = () => {
-    // Offline sandbox toggle fallback for preview purposes
-    if (onUpdateProfile) {
-      onUpdateProfile({ premiumActive: !premiumActive });
-    } else {
-      setLocalPremium((p) => !p);
-    }
     setIsPricingOpen(false);
+    redirectToDodoCheckout(user, userProfile);
   };
 
   const handleManageSubscription = () => {
-    // Local fallback toggle
-    if (onUpdateProfile) {
-      onUpdateProfile({ premiumActive: !premiumActive });
-    } else {
-      setLocalPremium((p) => !p);
-    }
+    redirectToDodoCheckout(user, userProfile);
   };
 
   const toggleNotifications = () => {

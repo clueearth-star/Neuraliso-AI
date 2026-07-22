@@ -135,17 +135,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
   // Dynamic Streak counting based on logs
   const currentStreak = entries.length > 0 ? Math.min(entries.length, 7) : 1;
 
-  // Real-time calculated Wellness Score
-  // Calculated dynamically reflecting: active stress sliders + logs + sleep estimates
-  const getDynamicWellnessScore = () => {
-    const stressInversed = 100 - (currentStress * 9); // ranges up to 100
-    const logBonus = Math.min(entries.length * 4, 10); // up to 10 points for journaling
-    return Math.min(Math.max(Math.round(stressInversed + logBonus), 10), 100);
-  };
-
-  // The database score is the SINGLE source of truth for the displayed Wellness Index.
+  // The database score (wellness_score column) is the SINGLE source of truth for the displayed Wellness Index.
   // There is no secondary locally-calculated value that can drift out of sync.
-  const activeWellnessScore = wellnessScore !== undefined ? wellnessScore : getDynamicWellnessScore();
+  const activeWellnessScore = wellnessScore ?? 0;
 
   // Dynamic Routine generation depending on active user mood (If Sad, If Anxious, If Lonely, If Overwhelmed)
   const getLastLoggedMood = () => {

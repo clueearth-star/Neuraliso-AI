@@ -1834,6 +1834,9 @@ app.get("/api/user-profile/:userId", async (req, res) => {
         const cached = fallbackUsers[userId];
         if (cached) {
           const subState = await getUserSubscriptionState(userId, cached.email);
+          const cachedScore = (cached.wellness_score !== null && cached.wellness_score !== undefined)
+            ? cached.wellness_score
+            : (cached.initial_score ?? 0);
           return res.json({
             id: cached.id,
             userId: cached.id,
@@ -1850,7 +1853,8 @@ app.get("/api/user-profile/:userId", async (req, res) => {
             wellnessGoals: cached.wellness_goals ? (typeof cached.wellness_goals === "string" ? JSON.parse(cached.wellness_goals) : cached.wellness_goals) : [],
             challenges: cached.challenges ? (typeof cached.challenges === "string" ? JSON.parse(cached.challenges) : cached.challenges) : [],
             coping: cached.coping ? (typeof cached.coping === "string" ? JSON.parse(cached.coping) : cached.coping) : [],
-            initialScore: cached.initial_score ?? 0,
+            wellnessScore: cachedScore,
+            initialScore: cachedScore,
             actionPlan: cached.action_plan ? (typeof cached.action_plan === "string" ? JSON.parse(cached.action_plan) : cached.action_plan) : [],
             calmXP: cached.calm_xp ?? 120,
             currentStreak: cached.current_streak ?? 5,
@@ -1865,6 +1869,9 @@ app.get("/api/user-profile/:userId", async (req, res) => {
     if (Array.isArray(data) && data.length > 0) {
       const record = data[0];
       const subState = await getUserSubscriptionState(userId, record.email);
+      const recordScore = (record.wellness_score !== null && record.wellness_score !== undefined)
+        ? record.wellness_score
+        : (record.initial_score ?? 0);
       return res.json({
         id: record.id,
         userId: record.id,
@@ -1881,7 +1888,8 @@ app.get("/api/user-profile/:userId", async (req, res) => {
         wellnessGoals: record.wellness_goals ? (typeof record.wellness_goals === "string" ? JSON.parse(record.wellness_goals) : record.wellness_goals) : [],
         challenges: record.challenges ? (typeof record.challenges === "string" ? JSON.parse(record.challenges) : record.challenges) : [],
         coping: record.coping ? (typeof record.coping === "string" ? JSON.parse(record.coping) : record.coping) : [],
-        initialScore: record.initial_score ?? 0,
+        wellnessScore: recordScore,
+        initialScore: recordScore,
         actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : [],
         calmXP: record.calm_xp ?? 120,
         currentStreak: record.current_streak ?? 5,
@@ -1931,6 +1939,10 @@ app.post("/api/user-profile", async (req, res) => {
     // Server-verified subscription status (client payload CANNOT override premium_active)
     const serverSubState = await getUserSubscriptionState(userId, profile.email);
 
+    const targetScore = profile.wellnessScore !== undefined
+      ? profile.wellnessScore
+      : (profile.initialScore !== undefined ? profile.initialScore : 0);
+
     // Map fields for columns
     const dbPayload = {
       id: userId,
@@ -1941,15 +1953,16 @@ app.post("/api/user-profile", async (req, res) => {
       notifications_enabled: profile.notificationsEnabled ?? true,
       onboarding_completed: profile.completedOnboarding ?? false,
       primary_goal: profile.wellnessGoals && profile.wellnessGoals.length > 0 ? profile.wellnessGoals[0] : (profile.primaryGoal || ""),
-      stress_baseline: profile.initialScore !== undefined ? profile.initialScore : (profile.stressBaseline !== undefined ? profile.stressBaseline : 5),
+      stress_baseline: profile.stressBaseline !== undefined ? profile.stressBaseline : 5,
       preferred_checkin_time: profile.preferredCheckinTime || "09:00 AM",
       age_range: profile.ageRange || "25-34",
       
-      // Additional columns to support existing app state:
+      wellness_score: targetScore,
+      initial_score: targetScore,
+
       wellness_goals: Array.isArray(profile.wellnessGoals) ? JSON.stringify(profile.wellnessGoals) : "[]",
       challenges: Array.isArray(profile.challenges) ? JSON.stringify(profile.challenges) : "[]",
       coping: Array.isArray(profile.coping) ? JSON.stringify(profile.coping) : "[]",
-      initial_score: profile.initialScore ?? 0,
       action_plan: Array.isArray(profile.actionPlan) ? JSON.stringify(profile.actionPlan) : "[]",
       calm_xp: profile.calmXP ?? 120,
       current_streak: profile.currentStreak ?? 5,
@@ -2049,6 +2062,7 @@ app.post("/api/user-profile", async (req, res) => {
           wellnessGoals: profile.wellnessGoals || [],
           challenges: profile.challenges || [],
           coping: profile.coping || [],
+          wellnessScore: dbPayload.wellness_score,
           initialScore: dbPayload.initial_score,
           actionPlan: profile.actionPlan || [],
           calmXP: dbPayload.calm_xp,
@@ -2080,6 +2094,7 @@ app.post("/api/user-profile", async (req, res) => {
           wellnessGoals: profile.wellnessGoals || [],
           challenges: profile.challenges || [],
           coping: profile.coping || [],
+          wellnessScore: dbPayload.wellness_score,
           initialScore: dbPayload.initial_score,
           actionPlan: profile.actionPlan || [],
           calmXP: dbPayload.calm_xp,

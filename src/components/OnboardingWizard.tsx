@@ -9,6 +9,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "motion/react";
 import neuralisoLogo from "../assets/images/neuraliso_logo_1783904719183.jpg";
+import { redirectToDodoCheckout } from "../lib/dodoCheckout";
 import { 
   Sparkles, 
   Brain, 
@@ -483,6 +484,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       challenges,
       coping,
       notifications,
+      wellnessScore: calculatedScore,
       initialScore: calculatedScore,
       actionPlan,
       preferredCheckinTime,
@@ -1497,8 +1499,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => {
-                    alert("Premium simulated upgrade enabled!");
-                    handleTriggerComplete(true);
+                    handleTriggerComplete(false);
+                    redirectToDodoCheckout(currentUser);
                   }}
                   className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold font-sans py-3.5 rounded-full text-xs uppercase tracking-wider text-center block shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 cursor-pointer"
                 >

@@ -11,6 +11,8 @@ import {
   CheckCircle2
 } from "lucide-react";
 
+import { redirectToDodoCheckout } from "../lib/dodoCheckout";
+
 interface DodoPaywallViewProps {
   user: {
     id: string;
@@ -79,13 +81,7 @@ export const DodoPaywallView: React.FC<DodoPaywallViewProps> = ({
   };
 
   const handleCheckoutRedirect = () => {
-    const checkoutBase = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V";
-    const redirectUrl = `${window.location.origin}${window.location.pathname}?status=success&userId=${encodeURIComponent(user.id)}`;
-    
-    // Construct dynamic checkout URL with email pre-population and client reference identifiers
-    const checkoutUrl = `${checkoutBase}?quantity=1&redirect_url=${encodeURIComponent(redirectUrl)}&customer_email=${encodeURIComponent(user.email)}&client_reference_id=${encodeURIComponent(user.id)}&metadata=${encodeURIComponent(JSON.stringify({ userId: user.id }))}`;
-    
-    window.location.href = checkoutUrl;
+    redirectToDodoCheckout(user, userProfile);
   };
 
   const handleLogout = async () => {

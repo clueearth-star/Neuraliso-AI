@@ -100,7 +100,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
   // Real-Time Voice & Chat Assistant States
   const [voiceCallActive, setVoiceCallActive] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(() => {
-    return localStorage.getItem("neuraliso_selected_voice") || "cLONiZ4hQ8VpQ4Sz";
+    const saved = localStorage.getItem("neuraliso_selected_voice");
+    if (saved && ["Kore", "Zephyr", "Puck", "Charon", "Fenrir"].includes(saved)) {
+      return saved;
+    }
+    return "Kore";
   });
 
   const handleVoiceChange = (voiceId: string) => {
@@ -210,13 +214,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
 
     if (!cleanedSpeech) return;
 
-    if (!premiumActive) {
-      // Free tier users fallback directly to local system speech synthesis
-      speakWithWebSpeech(cleanedSpeech);
-      return;
-    }
-
-    // Try ElevenLabs realistic voice via backend proxy first!
+    // Try Google Gemini TTS via backend proxy
     try {
       setIsSpeaking(true);
       const r = await fetch("/api/tts", {
@@ -224,6 +222,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: cleanedSpeech,
+          voiceName: selectedVoice,
           voiceId: selectedVoice,
           userId: userId
         })
@@ -231,39 +230,41 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
 
       if (r.ok) {
         const audioBlob = await r.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        activeAudioRef.current = audio;
+        if (audioBlob.size > 0) {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          activeAudioRef.current = audio;
 
-        audio.onplay = () => {
-          setIsSpeaking(true);
-        };
+          audio.onplay = () => {
+            setIsSpeaking(true);
+          };
 
-        audio.onended = () => {
-          setIsSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-          activeAudioRef.current = null;
-          // Automatically resume speech recognition after speaking is complete if call is still active
-          if (localStorage.getItem("neuraliso_voice_mode_active") === "true" && !isMuted) {
-            startListening();
-          }
-        };
+          audio.onended = () => {
+            setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+            activeAudioRef.current = null;
+            // Automatically resume speech recognition after speaking is complete if call is still active
+            if (localStorage.getItem("neuraliso_voice_mode_active") === "true" && !isMuted) {
+              startListening();
+            }
+          };
 
-        audio.onerror = (e) => {
-          console.warn("ElevenLabs Audio playback failed, reverting to system TTS:", e);
-          setIsSpeaking(false);
-          activeAudioRef.current = null;
-          speakWithWebSpeech(cleanedSpeech);
-        };
+          audio.onerror = (e) => {
+            console.warn("Gemini Audio playback failed, reverting to browser Web Speech:", e);
+            setIsSpeaking(false);
+            activeAudioRef.current = null;
+            speakWithWebSpeech(cleanedSpeech);
+          };
 
-        await audio.play();
-        return; // Success!
+          await audio.play();
+          return; // Success!
+        }
       } else {
         const responseData = await r.json().catch(() => ({}));
-        console.warn("ElevenLabs generation failed or key is not configured. Falling back:", responseData.error || r.statusText);
+        console.warn("Gemini TTS generation failed. Falling back to browser Web Speech:", responseData.error || r.statusText);
       }
     } catch (e) {
-      console.warn("Could not reach ElevenLabs proxy server, using web voice synthesis fallback:", e);
+      console.warn("Could not reach Gemini TTS server, using browser speech synthesis fallback:", e);
     }
 
     // Default Fallback
@@ -713,8 +714,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
               onChange={(e) => handleVoiceChange(e.target.value)}
               className="text-[10px] font-bold text-slate-800 bg-transparent border-none outline-none focus:ring-0 p-0 pr-6 cursor-pointer"
             >
-              <option value="cLONiZ4hQ8VpQ4Sz">Gradium (Custom)</option>
-              <option value="y50Lj77zmtFWFcuY">Aura (Classic)</option>
+              <option value="Kore">Kore (Warm & Soothing)</option>
+              <option value="Zephyr">Zephyr (Gentle & Calm)</option>
+              <option value="Puck">Puck (Upbeat)</option>
+              <option value="Charon">Charon (Deep)</option>
+              <option value="Fenrir">Fenrir (Confident)</option>
             </select>
           </div>
 
@@ -984,23 +988,23 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
             </div>
 
             <h3 className="text-xl font-serif font-bold italic tracking-wide">
-              {selectedVoice === "cLONiZ4hQ8VpQ4Sz" ? "Gradium the Companion" : "Aura the Mascot"}
+              Serene Companion ({selectedVoice})
             </h3>
             <p className="text-xs text-slate-400 capitalize mt-1.5 transition-all">
               {isSpeaking 
-                ? `🗣️ ${selectedVoice === "cLONiZ4hQ8VpQ4Sz" ? "Gradium" : "Aura"} is speaking...` 
+                ? `🗣️ Serene (${selectedVoice}) is speaking...` 
                 : isListening 
                 ? "🎙️ Listening to you..." 
-                : `⏳ ${selectedVoice === "cLONiZ4hQ8VpQ4Sz" ? "Gradium" : "Aura"} is resting...`}
+                : `⏳ Serene (${selectedVoice}) is ready...`}
             </p>
 
             {/* Subtitles as speech fallback readout */}
             <div className="mt-8 px-5 py-4 bg-slate-900/80 border border-slate-800 rounded-2xl max-w-sm mx-auto text-xs text-slate-200 min-h-[64px] flex items-center justify-center font-sans">
               {messages[messages.length - 1] 
                 ? (messages[messages.length - 1].sender === "bot" 
-                   ? `${selectedVoice === "cLONiZ4hQ8VpQ4Sz" ? "Gradium" : "Aura"}: "${parseAdBlockFromText(messages[messages.length - 1].text).cleanedText}"` 
+                   ? `Serene (${selectedVoice}): "${parseAdBlockFromText(messages[messages.length - 1].text).cleanedText}"` 
                    : `You: "${messages[messages.length - 1].text}"`)
-                : `${selectedVoice === "cLONiZ4hQ8VpQ4Sz" ? "Gradium" : "Aura"} is initializing...`}
+                : `Serene (${selectedVoice}) is initializing...`}
             </div>
 
             {speechError && (

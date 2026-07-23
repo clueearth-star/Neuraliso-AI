@@ -800,62 +800,92 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// API: ElevenLabs Text to Speech Generation with requested Voice ID
+// Helper: Ensure 16-bit PCM audio has a valid WAV header so standard browser audio elements can play it
+function ensureWavHeader(buffer: Buffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): Buffer {
+  if (buffer.length >= 4) {
+    const headerStr = buffer.subarray(0, 4).toString("utf8");
+    if (headerStr === "RIFF" || headerStr.startsWith("ID3")) {
+      return buffer;
+    }
+  }
+
+  const wavHeader = Buffer.alloc(44);
+  const dataSize = buffer.length;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+
+  wavHeader.write("RIFF", 0);
+  wavHeader.writeUInt32LE(36 + dataSize, 4);
+  wavHeader.write("WAVE", 8);
+
+  wavHeader.write("fmt ", 12);
+  wavHeader.writeUInt32LE(16, 16);
+  wavHeader.writeUInt16LE(1, 20); // PCM
+  wavHeader.writeUInt16LE(numChannels, 22);
+  wavHeader.writeUInt32LE(sampleRate, 24);
+  wavHeader.writeUInt32LE(byteRate, 28);
+  wavHeader.writeUInt16LE(blockAlign, 32);
+  wavHeader.writeUInt16LE(bitsPerSample, 34);
+
+  wavHeader.write("data", 36);
+  wavHeader.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([wavHeader, buffer]);
+}
+
+// API: Google Gemini Text-to-Speech Generation
 app.post("/api/tts", async (req, res) => {
   try {
-    const { text, voiceId, userId } = req.body;
-    
-    if (userId) {
-      const isPremium = await isUserPremium(userId);
-      if (!isPremium) {
-        return res.status(403).json({ error: "Access Denied: Professional Realistic CBT Audio synthesis is a Premium-tier feature." });
-      }
-    }
+    const { text, voiceName, voiceId } = req.body;
     
     if (!text || text.trim() === "") {
       return res.status(400).json({ error: "Text is required for speech synthesis." });
     }
 
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey || apiKey.trim() === "") {
-      return res.status(400).json({ 
-        error: "ELEVENLABS_API_KEY is not configured in environment. Displaying system voice fallback instead." 
-      });
+    const ai = getGenAI();
+    // Gemini TTS prebuilt voices: Kore (Warm & Soothing), Zephyr (Gentle & Smooth), Puck (Upbeat), Charon (Deep), Fenrir (Confident)
+    const validVoices = ["Kore", "Zephyr", "Puck", "Charon", "Fenrir"];
+    let selectedVoice = "Kore";
+    const requested = voiceName || voiceId;
+    if (requested && validVoices.includes(requested)) {
+      selectedVoice = requested;
     }
 
-    const vId = voiceId || "cLONiZ4hQ8VpQ4Sz";
-    console.log(`[TTS] Requesting ElevenLabs speech for voice: ${vId}`);
+    console.log(`[Gemini TTS] Generating speech with model 'gemini-3.1-flash-tts-preview' (voice: ${selectedVoice})`);
 
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${vId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": apiKey
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text: text.trim() }] }],
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: selectedVoice },
+          },
+        },
       },
-      body: JSON.stringify({
-        text: text,
-        model_id: "eleven_monolingual_v1",
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
-        }
-      })
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[TTS] ElevenLabs API feedback (reverting to system TTS): ${errText}`);
-      return res.status(response.status).json({ error: `ElevenLabs API feedback: ${errText}` });
+    const candidatePart = response.candidates?.[0]?.content?.parts?.[0];
+    const base64Audio = candidatePart?.inlineData?.data;
+
+    if (!base64Audio) {
+      console.warn("[Gemini TTS] Response contained no audio inlineData. Client will fallback to WebSpeech.");
+      return res.status(502).json({ error: "Gemini TTS did not return inlineData audio." });
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.send(buffer);
+    const rawBuffer = Buffer.from(base64Audio, "base64");
+    const mimeType = candidatePart?.inlineData?.mimeType || "audio/wav";
+    const audioBuffer = (mimeType.includes("pcm") || !mimeType.includes("mp3")) 
+      ? ensureWavHeader(rawBuffer, 24000, 1, 16) 
+      : rawBuffer;
+
+    res.setHeader("Content-Type", mimeType.includes("mp3") ? "audio/mpeg" : "audio/wav");
+    res.setHeader("Cache-Control", "no-cache");
+    return res.send(audioBuffer);
   } catch (error: any) {
-    console.warn("[TTS] Generation failed or key is unconfigured (falling back):", error.message || error);
-    res.status(500).json({ error: error.message || "Failed to generate speech." });
+    console.warn("[Gemini TTS] Generation failed (client will fallback to browser Web Speech):", error.message || error);
+    return res.status(500).json({ error: error.message || "Failed to generate speech with Gemini TTS." });
   }
 });
 

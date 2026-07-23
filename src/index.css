@@ -1,57 +1,118 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-serif: 'DM Serif Display', Georgia, serif;
-  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
-  --color-primary-sage: #5C8A6E;
-  --color-deep-sage: #3D6B52;
-  --color-soft-green: #DDEFE2;
-  --color-ivory-bg: #FAF8F4;
-  --color-light-mint: #E8F7F0;
-  --color-calm-blue: #A8D5F2;
-  --color-soft-sky: #D9F2FF;
-  --color-danger-red: #C0392B;
-  --color-light-red: #FDECEA;
-  --color-muted-text: #708090;
-  --color-dark-text: #2D3748;
+  --color-primary-sage: #00b8a9;
+  --color-deep-sage: #0a1628;
+  --color-soft-green: #0f1d33;
+  --color-ivory-bg: #0a1628;
+  --color-light-mint: #152540;
+  --color-calm-blue: #00d4ff;
+  --color-soft-sky: #00d4ff;
+  --color-danger-red: #f43f5e;
+  --color-light-red: #881337;
+  --color-muted-text: #94a3b8;
+  --color-dark-text: #f8fafc;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.01em;
+  color: #f8fafc;
+}
+
+::selection {
+  background: rgba(0, 212, 255, 0.3);
+  color: #ffffff;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a1628;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.5);
+}
+
+/* Typography Hierarchy Defaults */
+h1, h2, h3, h4, .font-serif {
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+p, span, body {
+  line-height: 1.5;
 }
 
 /* Base Dynamic Neumorphism Theme Setup */
 .theme-light {
-  --neu-bg: #E1E7E2;
-  --neu-shadow: #b2b9b3;
-  --neu-shadow-soft: #c2c9c2;
-  --neu-highlight: #ffffff;
-  background-color: #E1E7E2;
+  --neu-bg: #0a1628;
+  --neu-shadow: #070e1a;
+  --neu-shadow-soft: #0e1c31;
+  --neu-highlight: #152540;
+  background-color: #0a1628;
 }
 
 .theme-neutral {
-  --neu-bg: #E8E3DC;
-  --neu-shadow: #bfb9b1;
-  --neu-shadow-soft: #cfc9be;
-  --neu-highlight: #ffffff;
-  background-color: #E8E3DC;
+  --neu-bg: #0a1628;
+  --neu-shadow: #070e1a;
+  --neu-shadow-soft: #0e1c31;
+  --neu-highlight: #152540;
+  background-color: #0a1628;
 }
 
 @layer base {
   body {
     transition: background-color 0.4s ease, color 0.4s ease;
     overflow-x: hidden;
+    background-color: #0a1628;
+    color: #f8fafc;
   }
+}
+
+/* Skeleton Shimmer Loading Screens */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(0, 212, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite linear;
 }
 
 /* Custom continuous animations for calming interactions */
 @keyframes breathing {
   0%, 100% {
-    transform: scale(0.94);
-    box-shadow: 4px 4px 15px var(--neu-shadow), -4px -4px 15px var(--neu-highlight);
+    transform: scale(0.92);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.2), inset 0 0 20px rgba(0, 184, 169, 0.3);
   }
   50% {
-    transform: scale(1.06);
-    box-shadow: 10px 10px 25px var(--neu-shadow), -10px -10px 25px var(--neu-highlight);
+    transform: scale(1.08);
+    box-shadow: 0 0 60px rgba(0, 212, 255, 0.5), inset 0 0 35px rgba(0, 184, 169, 0.5);
   }
 }
 
@@ -80,12 +141,22 @@
 @keyframes float-glow {
   0%, 100% {
     transform: translateY(0px);
-    filter: drop-shadow(4px 4px 8px rgba(92, 138, 110, 0.15));
+    filter: drop-shadow(0 8px 16px rgba(0, 212, 255, 0.2));
   }
   50% {
     transform: translateY(-8px);
-    filter: drop-shadow(8px 8px 16px rgba(92, 138, 110, 0.25));
+    filter: drop-shadow(0 16px 28px rgba(0, 212, 255, 0.35));
   }
+}
+
+@keyframes shake-subtle {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake-subtle 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .animate-breathing {
@@ -104,112 +175,105 @@
   animation: float-glow 6s ease-in-out infinite;
 }
 
-/* Premium Neumorphic (Soft UI) Structural Styles */
-.wellness-card {
-  border-radius: 28px;
-  background-color: var(--neu-bg);
-  box-shadow: 8px 8px 18px var(--neu-shadow), 
-              -8px -8px 18px var(--neu-highlight);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+/* Micro-interaction button transition defaults */
+button, .btn-interactive {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.wellness-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 12px 12px 24px var(--neu-shadow), 
-              -12px -12px 24px var(--neu-highlight);
+button:hover, .btn-interactive:hover {
+  transform: scale(1.02);
+}
+
+button:active, .btn-interactive:active {
+  transform: scale(0.97);
+}
+
+/* Custom Input Focus Ring */
+input, textarea, select {
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #00d4ff !important;
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25) !important;
+}
+
+/* Glassmorphism & Card Styles */
+.wellness-card, .premium-glass-card {
+  border-radius: 20px;
+  background: rgba(15, 29, 51, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wellness-card:hover, .premium-glass-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 35px -10px rgba(0, 212, 255, 0.15), 0 0 1px 1px rgba(0, 212, 255, 0.2);
+  border-color: rgba(0, 212, 255, 0.25);
 }
 
 .premium-card {
-  border-radius: 28px;
-  background: linear-gradient(135deg, var(--neu-bg) 0%, #CCD9CD 100%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 8px 8px 18px var(--neu-shadow), 
-              -8px -8px 18px var(--neu-highlight);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(15, 29, 51, 0.85) 0%, rgba(21, 37, 64, 0.85) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.4);
 }
 
-/* Pressed/Inset Neumorphic Panels */
+/* Inset Panels */
 .neu-inset {
-  border-radius: 24px;
-  background-color: var(--neu-bg);
-  box-shadow: inset 4px 4px 8px var(--neu-shadow), 
-              inset -4px -4px 8px var(--neu-highlight);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  background-color: rgba(10, 22, 40, 0.8);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .neu-inset-sm {
-  border-radius: 16px;
-  background-color: var(--neu-bg);
-  box-shadow: inset 2.5px 2.5px 5px var(--neu-shadow), 
-              inset -2.5px -2.5px 5px var(--neu-highlight);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background-color: rgba(10, 22, 40, 0.8);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Neumorphic Clickable Buttons */
+/* Buttons */
 .neu-btn {
-  background-color: var(--neu-bg);
-  box-shadow: 5px 5px 12px var(--neu-shadow), 
-              -5px -5px 12px var(--neu-highlight);
-  border-radius: 9999px; /* Pill default */
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  background: linear-gradient(135deg, #00d4ff 0%, #00b8a9 100%);
+  color: #0a1628;
+  font-weight: 700;
+  border-radius: 9999px;
+  border: none;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .neu-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 7px 7px 16px var(--neu-shadow), 
-              -7px -7px 16px var(--neu-highlight);
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.45);
 }
 
-.neu-btn:active, .neu-btn.active {
-  transform: translateY(1.5px);
-  box-shadow: inset 3.5px 3.5px 7px var(--neu-shadow), 
-              inset -3.5px -3.5px 7px var(--neu-highlight);
+.neu-btn:active {
+  transform: scale(0.97);
 }
 
-/* Flat elements with small extrusions */
-.neu-flat-sm {
-  border-radius: 16px;
-  background-color: var(--neu-bg);
-  box-shadow: 4px 4px 10px var(--neu-shadow), 
-              -4px -4px 10px var(--neu-highlight);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.neu-flat-sm:hover {
-  box-shadow: 6px 6px 14px var(--neu-shadow), 
-              -6px -6px 14px var(--neu-highlight);
-}
-
-.neu-flat-sm:active {
-  box-shadow: inset 2.5px 2.5px 5px var(--neu-shadow), 
-              inset -2.5px -2.5px 5px var(--neu-highlight);
-}
-
-/* Neumorphic Form inputs, textarea, select */
+/* Form inputs */
 .neu-field {
-  background-color: var(--neu-bg);
-  box-shadow: inset 4px 4px 8px var(--neu-shadow), 
-              inset -4px -4px 8px var(--neu-highlight);
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(15, 29, 51, 0.9);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
   outline: none;
-  transition: all 0.25s ease-in-out;
+  padding: 12px 16px;
 }
 
-.neu-field:focus {
-  box-shadow: inset 5px 5px 10px var(--neu-shadow), 
-              inset -5px -5px 10px var(--neu-highlight);
-  border: 1px solid rgba(92, 138, 110, 0.4);
-}
-
-/* Glassmorphism & Neumorphism blended bottom navigation container */
 .nav-pill {
-  border-radius: 36px;
-  background-color: var(--neu-bg);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 10px 10px 24px var(--neu-shadow), 
-              -10px -10px 24px var(--neu-highlight);
+  border-radius: 50px;
+  background-color: rgba(15, 29, 51, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 /* Custom Styled Range Slider */
@@ -221,30 +285,27 @@ input[type="range"] {
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-  background-color: var(--neu-bg);
-  box-shadow: inset 2px 2px 5px var(--neu-shadow), 
-              inset -2px -2px 5px var(--neu-highlight);
-  height: 12px;
+  background-color: rgba(15, 29, 51, 0.9);
+  height: 8px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  margin-top: -4px; /* Centers thumb on the track */
-  background-color: #5C8A6E;
-  height: 20px;
-  width: 20px;
+  margin-top: -5px;
+  background: linear-gradient(135deg, #00d4ff, #00b8a9);
+  height: 18px;
+  width: 18px;
   border-radius: 50%;
-  box-shadow: 2px 2px 5px var(--neu-shadow), 
-              -2px -2px 5px var(--neu-highlight);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  transition: transform 0.15s ease-in-out;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+  border: 2px solid #0a1628;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
 }
 
 /* Card Flip 3D Styles */
@@ -262,39 +323,16 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: rotateY(180deg);
 }
 
-/* ========================================== */
-/* NEUROPLASM UX KEYFRAMES & UTILITY STYLES */
-/* ========================================== */
+/* Ambient Glassmorphism & Keyframes */
 @keyframes neuro-pulse {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes neuro-blob-shape {
-  0%, 100% {
-    border-radius: 50% 50% 45% 55% / 50% 45% 55% 50%;
-    transform: scale(1) rotate(0deg);
-  }
-  50% {
-    border-radius: 45% 55% 50% 50% / 45% 50% 50% 55%;
-    transform: scale(1.04) rotate(180deg);
-  }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 @keyframes soundwave {
-  0%, 100% {
-    transform: scaleY(0.25);
-  }
-  50% {
-    transform: scaleY(1.1);
-  }
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1.1); }
 }
 
 .sound-bar-animate {
@@ -302,42 +340,32 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform-origin: bottom;
 }
 
-@keyframes neuro-wave {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-/* Glassmorphism that blends into soft fluid backdrops */
 .bg-neuroplasm-glass {
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 32px 0 rgba(142, 157, 142, 0.08);
+  background: rgba(15, 29, 51, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* The fluid gradient shift blending soft lavender, muted teal, and translucent pearl tones */
 .neuro-plasma-glow {
   background: linear-gradient(270deg, 
-    rgba(225, 225, 250, 0.75) 0%, 
-    rgba(168, 213, 196, 0.45) 30%, 
-    rgba(250, 248, 244, 0.85) 60%, 
-    rgba(217, 242, 255, 0.6) 100%
+    rgba(0, 212, 255, 0.15) 0%, 
+    rgba(0, 184, 169, 0.15) 50%, 
+    rgba(15, 29, 51, 0.6) 100%
   );
   background-size: 400% 400%;
-  animation: neuro-pulse 7s ease-in-out infinite;
+  animation: neuro-pulse 8s ease-in-out infinite;
 }
 
-/* An animation that resembles the neural pulse traveling along an organic path */
-.animate-neuro-blob {
-  animation: neuro-blob-shape 10s ease-in-out infinite;
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-.neuro-melt-transition {
-  transition: all 0.65s cubic-bezier(0.16, 1, 0.3, 1);
-}
 

@@ -221,11 +221,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* 📊 CORE MAIN DASHBOARD HEADER & WELLNESS SCORE */}
-      <div className="wellness-card p-6 flex flex-col items-center justify-center relative overflow-hidden bg-white border">
-        <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-soft-green/30 rounded-full blur-xl pointer-events-none" />
+      <div className="wellness-card p-6 flex flex-col items-center justify-center relative overflow-hidden bg-slate-900/80 border border-slate-800 text-slate-100 backdrop-blur-xl shadow-2xl">
+        <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-teal-500/10 rounded-full blur-xl pointer-events-none" />
         
-        <p className="text-[9px] tracking-widest uppercase text-muted-text font-bold mb-1">CLINICAL SEED METRICS</p>
-        <h2 className="text-3xl font-serif italic text-dark-text leading-tight text-center">
+        <p className="text-[9px] tracking-widest uppercase text-teal-400 font-mono font-bold mb-1">MIND METRICS</p>
+        <h2 className="text-3xl font-serif italic text-white leading-tight text-center">
           Greetings, {userName || "Seeker"}
         </h2>
 
@@ -237,14 +237,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
               cx="80"
               cy="80"
               r="64"
-              className="stroke-slate-100 fill-none"
+              className="stroke-slate-800 fill-none"
               strokeWidth="9"
             />
             <circle
               cx="80"
               cy="80"
               r="64"
-              className="stroke-primary-sage fill-none transition-all duration-1000 ease-out"
+              className="stroke-teal-400 fill-none transition-all duration-1000 ease-out"
               strokeWidth="9"
               strokeDasharray={402}
               strokeDashoffset={402 - (402 * activeWellnessScore) / 100}
@@ -252,30 +252,30 @@ export const HomeView: React.FC<HomeViewProps> = ({
             />
           </svg>
           <div className="text-center z-10 space-y-0.5">
-            <span className="text-4xl font-serif italic font-bold text-slate-800">{activeWellnessScore}</span>
-            <span className="text-[10px] text-muted-text block uppercase font-mono tracking-widest">Wellness Index</span>
+            <span className="text-4xl font-serif italic font-bold text-white">{activeWellnessScore}</span>
+            <span className="text-[10px] text-slate-400 block uppercase font-mono tracking-widest">Wellness Index</span>
           </div>
         </div>
 
         {/* Dynamic score summary */}
-        <p className="text-xs text-muted-text text-center max-w-xs leading-snug">
-          Your active index is <strong className="text-primary-sage font-sans">{activeWellnessScore < 60 ? "Slightly Depleted" : "Healthy & Centered"}</strong> reflecting consistent somatic checklists.
+        <p className="text-xs text-slate-300 text-center max-w-xs leading-snug">
+          Your active index is <strong className="text-teal-300 font-sans">{activeWellnessScore < 60 ? "Slightly Depleted" : "Healthy & Centered"}</strong> reflecting consistent check-ins.
         </p>
       </div>
 
       {/* 📊 DAILY SNAPSHOT SUMMARY */}
-      <div className="wellness-card p-5 bg-white border grid grid-cols-3 gap-3 text-center">
+      <div className="wellness-card p-5 bg-slate-900/80 border border-slate-800 backdrop-blur-xl grid grid-cols-3 gap-3 text-center">
         <div>
-          <span className="text-xl font-bold font-mono text-primary-sage block">{currentStreak} Days</span>
-          <span className="text-[9.5px] text-muted-text uppercase font-sans">Wellness Streak</span>
+          <span className="text-xl font-bold font-mono text-teal-300 block">{currentStreak} Days</span>
+          <span className="text-[9.5px] text-slate-400 uppercase font-sans">Wellness Streak</span>
         </div>
         <div>
-          <span className="text-xl font-bold font-mono text-danger-red block">Lv {currentStress} / 10</span>
-          <span className="text-[9.5px] text-muted-text uppercase font-sans">Stress Baseline</span>
+          <span className="text-xl font-bold font-mono text-rose-400 block">Lv {currentStress} / 10</span>
+          <span className="text-[9.5px] text-slate-400 uppercase font-sans">Stress Baseline</span>
         </div>
         <div>
-          <span className="text-xl font-bold font-mono text-blue-800 block">7.2hr</span>
-          <span className="text-[9.5px] text-muted-text uppercase font-sans">Simulated Sleep</span>
+          <span className="text-xl font-bold font-mono text-cyan-300 block">7.2hr</span>
+          <span className="text-[9.5px] text-slate-400 uppercase font-sans">Rest Quality</span>
         </div>
       </div>
 
@@ -330,51 +330,51 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* ⚡ TODAY'S PROGRESS QUICK ACTIONS CLOUD */}
-      <div className="wellness-card p-6 bg-white border space-y-4">
-        <h3 className="text-sm font-bold text-dark-text uppercase tracking-wide font-sans">Quick Healing Modules</h3>
+      <div className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl space-y-4">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide font-sans">Quick Healing Modules</h3>
         
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => onNavigate("moodCheck")}
-            className="p-3.5 rounded-2xl bg-emerald-50/45 hover:bg-emerald-50 border border-emerald-100 flex flex-col justify-between items-start text-left"
+            className="p-3.5 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/60 flex flex-col justify-between items-start text-left cursor-pointer transition-all active:scale-95"
           >
             <span className="text-xl">✨</span>
             <div className="mt-2 text-xs">
-              <strong className="text-emerald-950 block">Mood Diary Check-In</strong>
-              <span className="text-[10px] text-slate-500 font-mono">1–10 factor records</span>
+              <strong className="text-emerald-200 block">Mood Check-In</strong>
+              <span className="text-[10px] text-slate-400 font-mono">1–10 factor records</span>
             </div>
           </button>
 
           <button
             onClick={() => onNavigate("chat")}
-            className="p-3.5 rounded-2xl bg-blue-50/45 hover:bg-blue-50 border border-blue-105 flex flex-col justify-between items-start text-left"
+            className="p-3.5 rounded-2xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-800/60 flex flex-col justify-between items-start text-left cursor-pointer transition-all active:scale-95"
           >
             <span className="text-xl">💬</span>
             <div className="mt-2 text-xs">
-              <strong className="text-blue-950 block">AI Companion Chat</strong>
-              <span className="text-[10px] text-slate-500 font-mono">Clinical CBT dialogs</span>
+              <strong className="text-cyan-200 block">AI Companion</strong>
+              <span className="text-[10px] text-slate-400 font-mono">Empathy & Reframing</span>
             </div>
           </button>
 
           <button
             onClick={() => onNavigate("sos")}
-            className="p-3.5 rounded-2xl bg-red-50 hover:bg-red-100/50 border border-red-105 flex flex-col justify-between items-start text-left"
+            className="p-3.5 rounded-2xl bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/60 flex flex-col justify-between items-start text-left cursor-pointer transition-all active:scale-95"
           >
             <span className="text-xl">🚨</span>
             <div className="mt-2 text-xs">
-              <strong className="text-red-950 block">SOS Calming Assists</strong>
-              <span className="text-[10px] text-slate-500 font-mono">EMDR & Vagus stimulators</span>
+              <strong className="text-rose-200 block">SOS First-Aid</strong>
+              <span className="text-[10px] text-slate-400 font-mono">Acute Grounding</span>
             </div>
           </button>
 
           <button
             onClick={() => onNavigate("hotline")}
-            className="p-3.5 rounded-2xl bg-amber-50/45 hover:bg-amber-50 border border-amber-101 flex flex-col justify-between items-start text-left"
+            className="p-3.5 rounded-2xl bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/60 flex flex-col justify-between items-start text-left cursor-pointer transition-all active:scale-95"
           >
             <span className="text-xl">📞</span>
             <div className="mt-2 text-xs">
-              <strong className="text-amber-950 block">Helpline Networks</strong>
-              <span className="text-[10px] text-slate-500 font-mono">24/7 Professional links</span>
+              <strong className="text-amber-200 block">Crisis Resources</strong>
+              <span className="text-[10px] text-slate-400 font-mono">24/7 Helplines</span>
             </div>
           </button>
         </div>
@@ -383,49 +383,49 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* EXPERIMENTAL DESIGN STUDIO ENTRY POINT */}
       <div 
         onClick={() => onNavigate("neuroSkeletons")}
-        className="wellness-card p-6 bg-gradient-to-tr from-[#E1E7E2] to-[#DDEFE2] border border-green-200 shadow-lg relative overflow-hidden cursor-pointer group hover:-translate-y-1 transition-all duration-300"
+        className="wellness-card p-6 bg-slate-900/80 border border-slate-800 hover:border-teal-500/50 backdrop-blur-xl shadow-lg relative overflow-hidden cursor-pointer group hover:-translate-y-1 transition-all duration-300"
       >
         {/* Soft glowing ambient circle */}
         <div className="absolute top-0 right-0 -mr-4 -mt-4 w-20 h-20 neuro-plasma-glow rounded-full animate-neuro-blob pointer-events-none opacity-80" />
         
         <div className="flex items-center gap-2 mb-2">
-          <span className="p-1.5 bg-white/80 border border-green-150 text-primary-sage rounded-xl flex items-center justify-center shadow-xs">
+          <span className="p-1.5 bg-teal-950/80 border border-teal-800/50 text-teal-300 rounded-xl flex items-center justify-center shadow-xs">
             🌿
           </span>
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#5C8A6E] font-semibold">
+          <span className="text-[10px] uppercase font-mono tracking-widest text-teal-400 font-semibold">
             Interactive Playground
           </span>
         </div>
         
-        <h4 className="text-lg font-serif italic text-slate-800 font-bold leading-tight group-hover:text-primary-sage transition-colors">
+        <h4 className="text-lg font-serif italic text-white font-bold leading-tight group-hover:text-teal-300 transition-colors">
           Explore Design Studio
         </h4>
-        <p className="text-xs text-slate-500 leading-normal pt-1.5 max-w-sm">
+        <p className="text-xs text-slate-400 leading-normal pt-1.5 max-w-sm">
           Experience our fluid, calming interface components, interactive relaxation cards, and custom theme presets.
         </p>
         
-        <div className="flex items-center gap-1 text-[11px] font-bold text-primary-sage/90 pt-3 group-hover:translate-x-1 transition-transform">
+        <div className="flex items-center gap-1 text-[11px] font-bold text-teal-300 pt-3 group-hover:translate-x-1 transition-transform">
           <span>Enter Organic Lab</span>
           <ChevronRight size={14} />
         </div>
       </div>
 
       {/* 🏆 GAMIFICATION STREAKS & BADGES SYSTEM */}
-      <div className="wellness-card p-5 bg-white border space-y-3.5">
-        <h3 className="text-sm font-bold text-dark-text uppercase tracking-wide">🏆 Resilience Awards & Milestones</h3>
-        <p className="text-[11px] text-muted-text -mt-1">Grow your recovery points automatically by consistent check-ins and journal entries.</p>
+      <div className="wellness-card p-5 bg-slate-900/80 border border-slate-800 backdrop-blur-xl space-y-3.5">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide">🏆 Resilience Awards &amp; Milestones</h3>
+        <p className="text-[11px] text-slate-400 -mt-1">Grow your recovery points automatically by consistent check-ins and journal entries.</p>
         
         <div className="grid grid-cols-2 gap-3.5 pt-1.5">
           {badges.map((bdg, i) => (
             <div key={i} className={`p-3 rounded-2xl border flex items-center gap-2.5 transition-all ${
               bdg.earned 
-                ? "bg-slate-50 border-primary-sage/40 opacity-100" 
-                : "bg-slate-50 border-slate-200 opacity-40 grayscale"
+                ? "bg-slate-950/60 border-teal-500/40 opacity-100" 
+                : "bg-slate-950/40 border-slate-800 opacity-40 grayscale"
             }`}>
-              <span className="text-2xl p-1 bg-white rounded-xl shadow-xs shrink-0">{bdg.icon}</span>
+              <span className="text-2xl p-1 bg-slate-900 rounded-xl shadow-xs shrink-0">{bdg.icon}</span>
               <div className="text-left font-sans text-[10.5px]">
-                <strong className="text-slate-900 block font-semibold leading-tight">{bdg.title}</strong>
-                <span className="text-slate-500 text-[9.5px] font-mono block leading-snug">{bdg.desc}</span>
+                <strong className="text-slate-200 block font-semibold leading-tight">{bdg.title}</strong>
+                <span className="text-slate-400 text-[9.5px] font-mono block leading-snug">{bdg.desc}</span>
               </div>
             </div>
           ))}
@@ -433,20 +433,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* 3. Daily affirmation display */}
-      <div id="daily-affirmation-card" className="wellness-card p-6 relative overflow-hidden">
+      <div id="daily-affirmation-card" className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl relative overflow-hidden">
         <div className="flex items-center gap-2 mb-3">
-          <span className="p-1.5 bg-soft-green/35 text-primary-sage rounded-xl">
+          <span className="p-1.5 bg-teal-950/80 text-teal-300 rounded-xl border border-teal-800/50">
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
           </span>
-          <h3 className="font-sans font-semibold text-dark-text text-sm tracking-wide">Daily Affirmation & CBT Insight</h3>
+          <h3 className="font-sans font-semibold text-white text-sm tracking-wide">Daily Affirmation &amp; Insight</h3>
         </div>
 
         <div className="space-y-3 pl-1">
-          <p className={`text-base font-serif italic text-dark-text leading-relaxed transition-all duration-500 ${loadingAffirmation ? "opacity-40" : ""}`}>
+          <p className={`text-base font-serif italic text-slate-100 leading-relaxed transition-all duration-500 ${loadingAffirmation ? "opacity-40" : ""}`}>
             "{affirmation}"
           </p>
-          <div className={`text-xs text-muted-text border-t border-soft-green/20 pt-3 flex items-start gap-1.5 transition-all duration-500 ${loadingAffirmation ? "opacity-40" : ""}`}>
-            <span className="font-bold text-primary-sage">Insight:</span>
+          <div className={`text-xs text-slate-400 border-t border-slate-800 pt-3 flex items-start gap-1.5 transition-all duration-500 ${loadingAffirmation ? "opacity-40" : ""}`}>
+            <span className="font-bold text-teal-400">Insight:</span>
             <span>{insight}</span>
           </div>
         </div>
@@ -456,20 +456,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <OracleDeck onJournalWithCard={onJournalWithCard} />
 
       {/* 🌸 COMMUNITY REVIEWS SECTION */}
-      <div id="community-reviews-launcher-card" className="wellness-card p-5 bg-white border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden group">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary-sage/60" />
+      <div id="community-reviews-launcher-card" className="wellness-card p-5 bg-slate-900/80 border border-slate-800 backdrop-blur-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-teal-400" />
         <div className="space-y-1">
-          <h4 className="text-sm font-bold text-slate-900 font-sans flex items-center gap-1.5">
+          <h4 className="text-sm font-bold text-white font-sans flex items-center gap-1.5">
             <span>🌸 Community Reflections</span>
-            <span className="text-[9px] font-mono font-bold bg-green-50 text-primary-sage px-1.5 py-0.5 rounded border border-green-100">Live Logs</span>
+            <span className="text-[9px] font-mono font-bold bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded border border-teal-800/60">Live Logs</span>
           </h4>
-          <p className="text-xs text-slate-500 max-w-sm">
-            Read other verified seekers' healing journeys or publish your own review directly to Google Drive.
+          <p className="text-xs text-slate-400 max-w-sm">
+            Read other verified seekers' healing journeys or publish your own review directly.
           </p>
         </div>
         <button
           onClick={() => onNavigate("reviews")}
-          className="bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl text-xs whitespace-nowrap hover:bg-slate-800 transition-all cursor-pointer shadow-md group-hover:scale-102 duration-250 active:scale-95"
+          className="bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs whitespace-nowrap hover:from-teal-400 hover:to-cyan-400 transition-all cursor-pointer shadow-md group-hover:scale-102 duration-250 active:scale-95"
         >
           Explore Feedback
         </button>
@@ -479,20 +479,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <AuraLounge />
 
       {/* 4. Interactive Live Stress Slider */}
-      <div id="interactive-stress-panel" className="wellness-card p-6 bg-white border">
+      <div id="interactive-stress-panel" className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-xl">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-sm font-sans font-semibold text-dark-text tracking-wide">Interactive Tension slider</h3>
+          <h3 className="text-sm font-sans font-semibold text-white tracking-wide">Interactive Tension Slider</h3>
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${stressInfo.bg} ${stressInfo.color}`}>
             {stressInfo.label}
           </span>
         </div>
 
-        <p className="text-xs text-muted-text mb-4">
+        <p className="text-xs text-slate-400 mb-4">
           Slide the bar below to reflect your active mental tension. Neuraliso recommends customized relief routines instantly.
         </p>
 
         <div className="space-y-3">
-          <div className="flex justify-between text-[11px] text-muted-text font-mono">
+          <div className="flex justify-between text-[11px] text-slate-400 font-mono">
             <span>1 (Peaceful)</span>
             <span>5 (Moderate)</span>
             <span>10 (Overwhelmed)</span>
@@ -505,19 +505,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
               max="10"
               value={currentStress}
               onChange={(e) => setCurrentStress(Number(e.target.value))}
-              className="w-full"
+              className="w-full accent-teal-400 cursor-pointer"
             />
           </div>
-          <div className="text-center font-mono text-sm font-bold text-dark-text pt-1">
-            Tension Level: <span className="text-primary-sage text-lg">{currentStress}</span> / 10
+          <div className="text-center font-mono text-sm font-bold text-slate-200 pt-1">
+            Tension Level: <span className="text-teal-400 text-lg">{currentStress}</span> / 10
           </div>
         </div>
       </div>
 
       {/* FEATURE 1: GRATITUDE GARDEN MODULE */}
-      <div id="gratitude-garden-widget" className="wellness-card p-6 space-y-4">
+      <div id="gratitude-garden-widget" className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-xl space-y-4">
         <div className="flex items-center gap-2">
-          <span className="p-1.5 bg-emerald-100 text-emerald-800 rounded-xl text-sm">
+          <span className="p-1.5 bg-emerald-950 text-emerald-300 rounded-xl text-sm border border-emerald-800/50">
             🌱
           </span>
           <div>
@@ -586,7 +586,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               value={newGratitudeText}
               onChange={(e) => setNewGratitudeText(e.target.value)}
               placeholder="I am grateful for..."
-              className="flex-1 p-3 border rounded-xl text-xs placeholder-muted-text text-dark-text"
+              className="flex-1 p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-xs placeholder-slate-500 text-white focus:outline-none focus:border-teal-400"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAddGratitude();
               }}
@@ -594,16 +594,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <button
               id="add-gratitude-submit-btn"
               onClick={handleAddGratitude}
-              className="bg-primary-sage text-white px-4 py-3.5 rounded-2xl font-bold font-sans text-xs hover:bg-deep-sage transition-all shadow-sm shrink-0 active:scale-95"
+              className="bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 px-4 py-3.5 rounded-2xl font-bold font-sans text-xs hover:from-teal-400 hover:to-cyan-400 transition-all shadow-sm shrink-0 active:scale-95 cursor-pointer"
             >
               + Sprout
             </button>
           </div>
 
-          <div className="max-h-24 overflow-y-auto pr-1 space-y-1.5 pt-2 border-t border-soft-green/10">
+          <div className="max-h-24 overflow-y-auto pr-1 space-y-1.5 pt-2 border-t border-slate-800">
             {gratitudes.slice(-4).reverse().map((g, idx) => (
-              <div key={idx} className="p-2 bg-white/50 border border-soft-green/5 text-[11px] leading-snug rounded-xl text-dark-text/90 italic flex items-center gap-1.5">
-                <span className="text-emerald-500 animate-pulse">✿</span>
+              <div key={idx} className="p-2 bg-slate-950/50 border border-slate-800 text-[11px] leading-snug rounded-xl text-slate-300 italic flex items-center gap-1.5">
+                <span className="text-teal-400 animate-pulse">✿</span>
                 <span>"{g}"</span>
               </div>
             ))}
@@ -612,33 +612,33 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
 
       {/* FEATURE 2: PROGRESSIVE MUSCLE RELAXATION GUIDELINE */}
-      <div id="pmr-somatic-guide" className="wellness-card p-6 space-y-4">
+      <div id="pmr-somatic-guide" className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-xl space-y-4">
         <div className="flex items-center gap-2">
-          <span className="p-1.5 bg-blue-105 text-blue-900 rounded-xl text-sm">
+          <span className="p-1.5 bg-cyan-950 text-cyan-300 rounded-xl text-sm border border-cyan-800/50">
             🧘‍♀️
           </span>
           <div>
-            <h3 className="font-sans font-semibold text-dark-text text-sm tracking-wide">Progressive Muscle Relaxation</h3>
-            <p className="text-[10px] text-muted-text uppercase font-mono">Interactive Physical Somatic Release</p>
+            <h3 className="font-sans font-semibold text-white text-sm tracking-wide">Progressive Muscle Relaxation</h3>
+            <p className="text-[10px] text-slate-400 uppercase font-mono">Interactive Somatic Release</p>
           </div>
         </div>
 
-        <p className="text-xs text-muted-text leading-relaxed">
-          Alternating high muscle tension with sudden neurological releases signals your parasympathetic network to instantly drain active panic. Let's travel through the somatic steps below.
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Alternating high muscle tension with sudden neurological releases signals your parasympathetic network to drain tension. Let's travel through the steps below.
         </p>
 
         {/* PMR Step box layout */}
-        <div className="p-4 rounded-3xl bg-sky-50/40 relative border border-blue-200/25">
+        <div className="p-4 rounded-3xl bg-slate-950/80 relative border border-slate-800">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-[10px] font-mono font-bold text-blue-900 border border-blue-900/30 px-2 py-0.5 rounded-full bg-blue-50">
+            <span className="text-[10px] font-mono font-bold text-teal-300 border border-teal-800/60 px-2 py-0.5 rounded-full bg-teal-950/80">
               PMR Focus Coach
             </span>
-            <span className="text-[10px] font-mono text-muted-text">
+            <span className="text-[10px] font-mono text-slate-400">
               Step {pmrStep + 1} of {pmrSteps.length}
             </span>
           </div>
 
-          <h4 className="font-serif italic font-semibold text-dark-text text-base mt-1">
+          <h4 className="font-serif italic font-semibold text-white text-base mt-1">
             {pmrSteps[pmrStep].title}
           </h4>
 
@@ -646,42 +646,42 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="grid grid-cols-2 gap-2 my-3 text-center">
             <button
               onClick={() => setPmrPhase("tense")}
-              className={`py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 pmrPhase === "tense"
-                  ? "bg-amber-100 border border-amber-300 text-amber-800 shadow-sm"
-                  : "bg-white/40 border border-transparent text-muted-text"
+                  ? "bg-amber-950/80 border border-amber-500/50 text-amber-300 shadow-sm"
+                  : "bg-slate-900 border border-slate-800 text-slate-400"
               }`}
             >
               ✊ 1. Tense up (5s)
             </button>
             <button
               onClick={() => setPmrPhase("release")}
-              className={`py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 pmrPhase === "release"
-                  ? "bg-emerald-100 border border-emerald-300 text-emerald-800 shadow-sm"
-                  : "bg-white/40 border border-transparent text-muted-text"
+                  ? "bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 shadow-sm"
+                  : "bg-slate-900 border border-slate-800 text-slate-400"
               }`}
             >
-              🍃 2. Release & Breathe
+              🍃 2. Release &amp; Breathe
             </button>
           </div>
 
           {/* Main instruction box */}
-          <div className="p-3 bg-white/70 border border-blue-100/50 rounded-2xl min-h-20 flex items-center">
-            <p className="text-xs text-dark-text/95 leading-relaxed font-sans">
+          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl min-h-20 flex items-center">
+            <p className="text-xs text-slate-200 leading-relaxed font-sans">
               {pmrPhase === "tense" ? pmrSteps[pmrStep].instruction : pmrSteps[pmrStep].releaseInstruction}
             </p>
           </div>
 
           {/* Step navigator button controls */}
-          <div className="flex justify-between items-center mt-4 pt-3 border-t border-blue-100/40">
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
             <button
               disabled={pmrStep === 0}
               onClick={() => {
                 setPmrStep((prev) => prev - 1);
                 setPmrPhase("tense");
               }}
-              className="px-3.5 py-1.5 rounded-xl border border-blue-100 text-[10px] font-bold text-muted-text hover:bg-white/60 disabled:opacity-30 self-start cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl border border-slate-800 text-[10px] font-bold text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
             >
               Previous
             </button>
@@ -695,7 +695,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   setPmrPhase("tense");
                 }
               }}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-900 text-white text-[10px] font-bold hover:bg-blue-950 shadow-xs cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-slate-950 text-[10px] font-bold hover:from-teal-400 hover:to-cyan-400 shadow-sm cursor-pointer"
             >
               {pmrStep === pmrSteps.length - 1 ? "Start Over" : "Next Muscle"}
             </button>

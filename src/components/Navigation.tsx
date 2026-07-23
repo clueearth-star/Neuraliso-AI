@@ -32,14 +32,14 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveVie
                 sounds.playClick();
                 setActiveView(item.id as ActiveView);
               }}
-              className="relative flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300"
+              className="relative flex flex-col items-center justify-center px-3 py-1.5 rounded-2xl transition-all duration-300 group cursor-pointer"
             >
               {/* Active Highlight Circle with micro animation */}
               <div
-                className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
                   isActive
-                    ? "neu-inset text-primary-sage scale-95"
-                    : "bg-transparent text-muted-text hover:text-dark-text"
+                    ? "bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border border-teal-400/40 text-cyan-300 scale-105 shadow-lg shadow-teal-500/20"
+                    : "bg-transparent text-slate-400 group-hover:text-slate-200"
                 }`}
               >
                 {item.icon}
@@ -49,8 +49,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveVie
               <span
                 className={`text-[10px] mt-1 font-medium transition-all duration-300 ${
                   isActive
-                    ? "text-deep-sage font-semibold"
-                    : "text-muted-text/80"
+                    ? "text-cyan-300 font-bold"
+                    : "text-slate-400 group-hover:text-slate-200"
                 }`}
               >
                 {item.label}
@@ -59,7 +59,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveVie
               {/* Tiny bottom dot indicator */}
               {isActive && (
                 <span
-                  className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary-sage"
+                  className="absolute -bottom-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/80"
                 />
               )}
             </button>

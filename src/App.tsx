@@ -746,11 +746,11 @@ function AppContent({
         />
       </div>
       
-      {/* BACKGROUND DECORATIONS (Calm Technology leaves and nature waves) */}
-      <div className="absolute top-0 left-0 w-full h-[600px] pointer-events-none overflow-hidden blur-3xl z-0 select-none">
-        <div className="absolute top-[-100px] left-[-150px] w-[450px] h-[450px] rounded-full bg-soft-green/35 opacity-40 animate-drift" />
-        <div className="absolute top-[200px] right-[-200px] w-[500px] h-[500px] rounded-full bg-calm-blue/20 opacity-30 animate-pulse-slow" />
-        <div className="absolute bottom-0 left-[20%] w-[350px] h-[350px] rounded-full bg-light-mint/35 opacity-40" />
+      {/* AMBIENT GLOW ORBS (Fixed background radial glows) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none">
+        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-radial from-cyan-500/15 via-teal-500/5 to-transparent blur-3xl animate-pulse-slow" />
+        <div className="absolute top-1/3 -right-32 w-[30rem] h-[30rem] rounded-full bg-radial from-teal-400/15 via-cyan-600/5 to-transparent blur-3xl animate-drift" />
+        <div className="absolute -bottom-32 left-1/4 w-96 h-96 rounded-full bg-radial from-cyan-600/10 via-emerald-500/5 to-transparent blur-3xl" />
       </div>
 
       {/* FIXED CORNER DECORATION LEAVES (Symmetric aesthetic finish) */}

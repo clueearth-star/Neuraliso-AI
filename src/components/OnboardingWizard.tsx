@@ -778,7 +778,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     {authMode === "options" && (
                       <>
                         <p className="text-xs text-slate-500 leading-relaxed mb-1">
-                          Syncing your personal biometric indices, emotional diagnostic metrics, and Solfeggio soundscapes requires secure cloud authorization.
+                          Save your daily mood check-ins, personal journal entries, and favorite breathing exercises securely.
                         </p>
                         
                         <button
@@ -1232,8 +1232,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 {/* Notifications setup */}
                 <div className="flex justify-between items-center p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
                   <div>
-                    <span className="text-xs font-bold text-slate-800 block">Smart Somatic Reminders</span>
-                    <span className="text-[10px] text-slate-500 font-mono">Biometric breathing cues and wellness check reminders</span>
+                    <span className="text-xs font-bold text-slate-800 block">Daily Mindfulness Reminders</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Gentle breathing cues and daily mood check-in reminders</span>
                   </div>
                   <button
                     onClick={() => setNotifications(!notifications)}

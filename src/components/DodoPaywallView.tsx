@@ -147,9 +147,9 @@ export const DodoPaywallView: React.FC<DodoPaywallViewProps> = ({
             <div className="space-y-4 text-left text-xs text-slate-600 bg-slate-50/70 border border-slate-100 p-5 rounded-2xl">
               <p className="leading-relaxed">
                 {isTrialExpired ? (
-                  "Your 3-day trial period has concluded. To continue enjoying uninterrupted clinical-grade stress relief, biometric feedback, and Solfeggio soundscapes, please verify or reconnect your active payment method."
+                  "Your 3-day trial period has concluded. To continue enjoying uninterrupted guided breathing, mood check-ins, and sleep tools, please verify or reconnect your active payment method."
                 ) : (
-                  "Neuraliso is a highly optimized clinical wellness space. To prevent spam and secure dedicated premium AI diagnostic models, we require a connected payment method to register your account."
+                  "Neuraliso is a quiet space for your mind. To provide continuous access to supportive wellness tools, we request a connected payment method to register your account."
                 )}
               </p>
               

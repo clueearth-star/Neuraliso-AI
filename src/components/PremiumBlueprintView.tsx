@@ -114,7 +114,7 @@ export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entr
                   )}
                 </button>
                 <p className="text-[9px] text-slate-400 mt-2 font-mono">
-                  *Synthesizes biometric profiles from {entries.length || 7} logged wellness records.
+                  *Generates personalized insights from {entries.length || 7} logged wellness records.
                 </p>
               </>
             ) : (
@@ -123,7 +123,7 @@ export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entr
                   🔒 Premium Feature
                 </span>
                 <p className="text-[11px] text-slate-300 leading-relaxed max-w-sm mx-auto">
-                  Get custom bi-weekly CBT reports, vagus somatic exercise homework, and personalized clinical diagnostics based on your historical emotional patterns.
+                  Get custom bi-weekly reflection reports, calming breathing exercises, and personalized insights based on your mood check-in patterns.
                 </p>
                 <button
                   onClick={() => {

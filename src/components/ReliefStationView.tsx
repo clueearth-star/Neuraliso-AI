@@ -340,7 +340,7 @@ export const ReliefStationView: React.FC<ReliefStationViewProps> = ({ userProfil
     },
     {
       id: 11,
-      title: "Tactile Grounding Ritual (5-4-3-2-1)",
+      title: "Sensory Grounding Ritual (5-4-3-2-1)",
       themeType: "challenge",
       subtitle: "Escape the mental labyrinth through your five senses",
       guideName: "Lama Tenzin, Mindfulness Advisor",
@@ -2202,8 +2202,8 @@ export const ReliefStationView: React.FC<ReliefStationViewProps> = ({ userProfil
 
       {/* FOOTER STATS SEAL */}
       <div className="pt-2 pb-1 text-center shrink-0 flex items-center justify-center gap-1.5 text-[8.5px] text-slate-500 font-mono uppercase">
-        <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping" />
-        <span>Strict Clinical Restraint Certified • HIPAA Secure Connection</span>
+        <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-ping" />
+        <span>Your privacy matters. We keep your data safe.</span>
       </div>
 
     </div>

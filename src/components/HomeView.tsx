@@ -3,6 +3,7 @@ import { ActiveView, JournalEntry } from "../types";
 import { LeafLogoIcon, SadMoodIcon, AnxiousMoodIcon, OverwhelmedMoodIcon, LonelyMoodIcon } from "./Icons";
 import { OracleDeck } from "./OracleDeck";
 import { AuraLounge } from "./AuraLounge";
+import { HowItWorksSection } from "./HowItWorksSection";
 import { ChevronRight } from "lucide-react";
 
 interface HomeViewProps {
@@ -191,7 +192,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           immediate: "Inhale slowly for 4s, hold for 2s, and exhale with parted lips for 6s.",
           fiveMin: "Trigger the cold water face routine to launch the Mammalian Dive Reflex instantly.",
           fifteenMin: "Tap the AI Companion chat and execute a guided Cognitive reframing thought assessment.",
-          longTerm: "Integrate biometric sleep monitors and perform consistent paced box breathing."
+          longTerm: "Track your sleep patterns and perform consistent paced box breathing."
         };
     }
   };
@@ -379,7 +380,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </div>
 
-      {/* 🧬 EXPERIMENTAL NEUROPLASM LABORATORY ENTRY POINT */}
+      {/* EXPERIMENTAL DESIGN STUDIO ENTRY POINT */}
       <div 
         onClick={() => onNavigate("neuroSkeletons")}
         className="wellness-card p-6 bg-gradient-to-tr from-[#E1E7E2] to-[#DDEFE2] border border-green-200 shadow-lg relative overflow-hidden cursor-pointer group hover:-translate-y-1 transition-all duration-300"
@@ -389,18 +390,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
         
         <div className="flex items-center gap-2 mb-2">
           <span className="p-1.5 bg-white/80 border border-green-150 text-primary-sage rounded-xl flex items-center justify-center shadow-xs">
-            🧠
+            🌿
           </span>
           <span className="text-[10px] uppercase font-mono tracking-widest text-[#5C8A6E] font-semibold">
-            Experimental Laboratory
+            Interactive Playground
           </span>
         </div>
         
         <h4 className="text-lg font-serif italic text-slate-800 font-bold leading-tight group-hover:text-primary-sage transition-colors">
-          Explore Neuroplasm UX™
+          Explore Design Studio
         </h4>
         <p className="text-xs text-slate-500 leading-normal pt-1.5 max-w-sm">
-          Experience our fluid, morphing neural interfaces, liquid pulse skeletons, and customizable glassmorphism laboratory playground.
+          Experience our fluid, calming interface components, interactive relaxation cards, and custom theme presets.
         </p>
         
         <div className="flex items-center gap-1 text-[11px] font-bold text-primary-sage/90 pt-3 group-hover:translate-x-1 transition-transform">
@@ -700,6 +701,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* HOW IT WORKS & FEATURES SECTION */}
+      <div className="-mx-4 sm:-mx-6 pt-6">
+        <HowItWorksSection onStartNow={() => onNavigate("moodCheck")} />
       </div>
     </div>
   );

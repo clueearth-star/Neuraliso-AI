@@ -18,6 +18,10 @@ import { EnterprisePortal } from "./components/EnterprisePortal";
 import { ReviewsView } from "./components/ReviewsView";
 import { NeuroplasmWorkshopView } from "./components/NeuroplasmWorkshopView";
 import { MascotAssistant } from "./components/MascotAssistant";
+import { CrisisBanner } from "./components/CrisisBanner";
+import { Navbar } from "./components/Navbar";
+import { HowItWorksSection } from "./components/HowItWorksSection";
+import { Footer } from "./components/Footer";
 import { analytics } from "./lib/analytics";
 import { sounds } from "./lib/sounds";
 
@@ -713,7 +717,34 @@ function AppContent({
      "REGULAR VIEW ROUTING (Main App)";
 
   return (
-    <div className={`min-h-screen relative font-sans pb-24 pt-44 md:pt-32 overflow-x-hidden transition-colors duration-500 ${bgClass}`}>
+    <div className={`min-h-screen relative font-sans pb-12 overflow-x-hidden transition-colors duration-500 ${bgClass}`}>
+      {/* 🚨 CRISIS BANNER FIXED AT TOP */}
+      <CrisisBanner />
+
+      {/* 🧭 NAVIGATION BAR AT TOP */}
+      <div className="pt-8">
+        <Navbar 
+          onGetStarted={() => {
+            if (!user && !isOfflineSandbox) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              setActiveView("home");
+            }
+          }}
+          onNavigateSection={(sectionId) => {
+            const el = document.getElementById(sectionId);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth" });
+            } else {
+              setActiveView("home");
+              setTimeout(() => {
+                const target = document.getElementById(sectionId);
+                if (target) target.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            }
+          }}
+        />
+      </div>
       
       {/* BACKGROUND DECORATIONS (Calm Technology leaves and nature waves) */}
       <div className="absolute top-0 left-0 w-full h-[600px] pointer-events-none overflow-hidden blur-3xl z-0 select-none">
@@ -840,17 +871,22 @@ function AppContent({
           /* ENTERPRISE ADMIN OVERVIEW DEPLOYED */
           <EnterprisePortal onBack={() => setEnterpriseActive(false)} />
         ) : (!isOnboarded && !isOfflineSandbox) ? (
-          /* AUTH ONBOARDING PANEL TAKE-OVER */
-          <OnboardingWizard 
-            onCompleteOnboarding={handleCompleteOnboarding}
-            onEnterEnterpriseDemo={() => setEnterpriseActive(true)}
-            currentUser={user}
-            loginWithGoogle={loginWithGoogle}
-            loginWithEmail={loginWithEmail}
-            registerWithEmail={registerWithEmail}
-            loginAnonymously={loginAnonymously}
-            isAuth0Active={isAuth0Active}
-          />
+          /* AUTH ONBOARDING PANEL & LANDING PAGE WITH SCROLLABLE FEATURES SECTION */
+          <div className="space-y-12">
+            <OnboardingWizard 
+              onCompleteOnboarding={handleCompleteOnboarding}
+              onEnterEnterpriseDemo={() => setEnterpriseActive(true)}
+              currentUser={user}
+              loginWithGoogle={loginWithGoogle}
+              loginWithEmail={loginWithEmail}
+              registerWithEmail={registerWithEmail}
+              loginAnonymously={loginAnonymously}
+              isAuth0Active={isAuth0Active}
+            />
+            <HowItWorksSection onStartNow={() => {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }} />
+          </div>
         ) : (
           /* REGULAR VIEW ROUTING */
           <div id="neuraliso-core-applet-viewport">
@@ -997,6 +1033,9 @@ function AppContent({
       {!crisisActive && !enterpriseActive && (!loadingAuth && (user || isOfflineSandbox || isOnboarded)) && (
         <MascotAssistant activeView={activeView} entriesCount={entries.length} triggerEvent={mascotEvent} />
       )}
+
+      {/* FOOTER */}
+      <Footer />
     </div>
   );
 }

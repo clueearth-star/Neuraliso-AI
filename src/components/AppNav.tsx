@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   Home, 
@@ -9,21 +9,46 @@ import {
   TrendingUp, 
   Settings as SettingsIcon, 
   Volume2, 
-  VolumeX,
-  Flame
+  VolumeX, 
+  Flame, 
+  MessageCircle,
+  User,
+  LogOut,
+  ChevronDown,
+  LogIn,
+  UserPlus,
+  CheckCircle2,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
+import { useAuth } from "../contexts/AuthContext";
 import neuralisoLogo from "../assets/images/neuraliso_logo_1783904719183.jpg";
 
 export const AppNav: React.FC = () => {
   const location = useLocation();
+  const { user, profile, signOut, syncStatus, syncMessage, isAnonymous } = useAuth();
+  
   const [isMuted, setIsMuted] = useState(sounds.getMuteState());
   const [streak, setStreak] = useState(storage.getStreak());
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setStreak(storage.getStreak());
   }, [location.pathname]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const toggleSound = () => {
     const nextMute = !isMuted;
@@ -34,6 +59,7 @@ export const AppNav: React.FC = () => {
 
   const navItems = [
     { path: "/app", label: "Dashboard", icon: <Home className="w-5 h-5" /> },
+    { path: "/app/chat", label: "AI Coach", icon: <MessageCircle className="w-5 h-5" /> },
     { path: "/app/mood", label: "Mood", icon: <Smile className="w-5 h-5" /> },
     { path: "/app/breathe", label: "Breathe", icon: <Wind className="w-5 h-5" /> },
     { path: "/app/sleep", label: "Sleep", icon: <Moon className="w-5 h-5" /> },
@@ -41,6 +67,9 @@ export const AppNav: React.FC = () => {
     { path: "/app/progress", label: "Progress", icon: <TrendingUp className="w-5 h-5" /> },
     { path: "/app/settings", label: "Settings", icon: <SettingsIcon className="w-5 h-5" /> },
   ];
+
+  const displayName = profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "User";
+  const firstLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <>
@@ -62,7 +91,7 @@ export const AppNav: React.FC = () => {
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-1 rounded-full">
+          <nav className="hidden lg:flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-1 rounded-full">
             {navItems.map((item) => {
               const active = location.pathname === item.path;
               return (
@@ -70,7 +99,7 @@ export const AppNav: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   onClick={() => sounds.playClick()}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     active
                       ? "bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] shadow-sm shadow-[#00d4ff]/20 scale-105"
                       : "text-white/70 hover:text-white hover:bg-white/5"
@@ -83,8 +112,8 @@ export const AppNav: React.FC = () => {
             })}
           </nav>
 
-          {/* Right Actions: Streak & Sound Toggle */}
-          <div className="flex items-center gap-3">
+          {/* Right Actions: Streak, Sound Toggle, Auth */}
+          <div className="flex items-center gap-2.5">
             {/* Streak Badge */}
             <Link
               to="/app/progress"
@@ -104,12 +133,136 @@ export const AppNav: React.FC = () => {
             >
               {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-[#00d4ff]" />}
             </button>
+
+            {/* Auth Area */}
+            {user ? (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    setShowUserMenu(!showUserMenu);
+                  }}
+                  className="flex items-center gap-2 p-1 pl-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer"
+                >
+                  {/* Sync Status Mini Indicator */}
+                  {syncStatus === "syncing" && (
+                    <Loader2 className="w-3.5 h-3.5 text-[#00d4ff] animate-spin" title="Syncing..." />
+                  )}
+                  {syncStatus === "synced" && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" title="Data backed up" />
+                  )}
+                  {syncStatus === "error" && (
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" title="Offline / Local only" />
+                  )}
+
+                  <span className="text-xs font-semibold text-white/90 hidden sm:inline max-w-[100px] truncate">
+                    {displayName}
+                  </span>
+
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-xs flex items-center justify-center shadow-sm overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      firstLetter
+                    )}
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-white/60 mr-1 transition-transform ${showUserMenu ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* User Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#111A2E] border border-white/15 shadow-2xl backdrop-blur-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 z-50">
+                    <div className="px-3 py-2 border-b border-white/10">
+                      <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                      <p className="text-[11px] text-white/50 truncate">{user.email}</p>
+                      {syncMessage && (
+                        <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{syncMessage}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <Link
+                      to="/app/settings"
+                      onClick={() => {
+                        sounds.playClick();
+                        setShowUserMenu(false);
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <User className="w-4 h-4 text-[#00d4ff]" />
+                      <span>Profile</span>
+                    </Link>
+
+                    <Link
+                      to="/app/settings"
+                      onClick={() => {
+                        sounds.playClick();
+                        setShowUserMenu(false);
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <SettingsIcon className="w-4 h-4 text-[#00b8a9]" />
+                      <span>Settings</span>
+                    </Link>
+
+                    <div className="border-t border-white/10 pt-1">
+                      <button
+                        onClick={() => {
+                          sounds.playClick();
+                          setShowUserMenu(false);
+                          signOut();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  onClick={() => sounds.playClick()}
+                  className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-[#00d4ff]" />
+                  <span className="hidden sm:inline">Sign in</span>
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => sounds.playClick()}
+                  className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] text-xs font-bold shadow-sm shadow-[#00d4ff]/20 hover:opacity-90 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Sign up</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
+      {/* Non-intrusive banner for anonymous mode */}
+      {!user && isAnonymous && (
+        <div className="bg-gradient-to-r from-[#00d4ff]/15 via-emerald-500/15 to-[#00b8a9]/15 border-b border-white/10 px-4 py-2 text-center text-xs font-medium text-white flex items-center justify-center gap-3">
+          <span className="text-white/90">Sign in to back up your data across devices</span>
+          <Link
+            to="/login"
+            onClick={() => sounds.playClick()}
+            className="px-2.5 py-0.5 rounded-full bg-[#00d4ff] text-[#0B1121] font-bold text-[11px] hover:bg-[#00d4ff]/90 transition-all shadow-sm shrink-0"
+          >
+            Sign In &rarr;
+          </Link>
+        </div>
+      )}
+
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#111A2E]/95 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex items-center justify-around">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#111A2E]/95 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex items-center justify-around">
         {navItems.map((item) => {
           const active = location.pathname === item.path;
           return (

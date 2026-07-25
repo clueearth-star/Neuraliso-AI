@@ -49,3 +49,22 @@ export interface ActivityLog {
   description: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: "user" | "ai" | "system";
+  text: string;
+  timestamp: number;
+  action?: {
+    label: string;
+    route: string;
+  };
+}
+
+export interface CrisisLog {
+  id: string;
+  timestamp: number;
+  date: string;
+  keyword: string;
+  message: string;
+}
+

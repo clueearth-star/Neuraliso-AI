@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Moon, Play, Pause, Volume2, VolumeX, Clock, CloudRain, Radio, Disc, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Moon, Play, Pause, Volume2, VolumeX, Clock, CloudRain, Radio, Disc, Sparkles, Bot, MessageCircle } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
 
@@ -38,6 +39,7 @@ const SLEEP_SOUNDS: SoundItem[] = [
 ];
 
 export const SleepSoundsView: React.FC = () => {
+  const navigate = useNavigate();
   const [activeSound, setActiveSound] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(0.6);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null); // null = all night
@@ -265,6 +267,38 @@ export const SleepSoundsView: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Sleep Story AI Banner Card */}
+      <div 
+        onClick={() => {
+          sounds.playClick();
+          navigate("/app/chat", { 
+            state: { 
+              initialPrompt: "Tell me a calming sleep story to help me drift off peacefully tonight." 
+            } 
+          });
+        }}
+        className="wellness-card p-6 sm:p-8 bg-gradient-to-r from-[#131C31] via-[#1A2338] to-indigo-950/40 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-indigo-400 transition-all duration-300 group cursor-pointer shadow-xl max-w-3xl mx-auto"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0 group-hover:scale-110 transition-transform">
+            <Bot className="w-6 h-6" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-bold text-white tracking-tight">
+              Want a soothing bedtime narrative?
+            </h3>
+            <p className="text-xs text-white/60 mt-0.5">
+              Ask your AI companion to generate a personalized, tranquil sleep story.
+            </p>
+          </div>
+        </div>
+
+        <div className="px-5 py-2.5 rounded-full bg-indigo-500/20 hover:bg-indigo-500 border border-indigo-500/40 text-indigo-300 hover:text-white font-extrabold text-xs transition-all flex items-center gap-2 shrink-0">
+          <MessageCircle className="w-4 h-4" />
+          <span>Tell Me a Sleep Story</span>
+        </div>
       </div>
     </div>
   );

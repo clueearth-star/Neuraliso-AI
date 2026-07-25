@@ -3,7 +3,6 @@ import {
   TrendingUp, 
   PieChart as PieIcon, 
   Tag, 
-  Download, 
   Flame, 
   Calendar, 
   CheckCircle2, 
@@ -32,7 +31,6 @@ export const ProgressView: React.FC = () => {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [streak, setStreak] = useState<number>(0);
-  const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
     setMoods(storage.getMoods());
@@ -100,23 +98,6 @@ export const ProgressView: React.FC = () => {
 
   const diff = Number((thisWeekAvg - lastWeekAvg).toFixed(1));
 
-  const handleExportJSON = () => {
-    sounds.playSuccess();
-    const jsonStr = storage.exportAllDataJSON();
-    const blob = new Blob([jsonStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `neuraliso-wellness-export-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 3000);
-  };
-
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10 pb-28 md:pb-12 animate-page-in text-left">
       {/* Header */}
@@ -133,15 +114,6 @@ export const ProgressView: React.FC = () => {
             Check in a few times and we&apos;ll show you patterns. Everything is stored privately on your device.
           </p>
         </div>
-
-        {/* Export JSON Button */}
-        <button
-          onClick={handleExportJSON}
-          className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-        >
-          <Download className="w-4 h-4 text-[#00d4ff]" />
-          <span>{downloaded ? "Exported!" : "Export Data (JSON)"}</span>
-        </button>
       </div>
 
       {/* Top Cards: Summary & Streak & This vs Last week */}

@@ -10,7 +10,9 @@ import {
   ArrowRight, 
   CheckCircle2, 
   Clock,
-  Sparkles
+  Sparkles,
+  Bot,
+  MessageCircle
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -23,19 +25,23 @@ import {
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { ActivityLog } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [onboarding] = useState(storage.getOnboarding());
   const [streak, setStreak] = useState(0);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [latestMood, setLatestMood] = useState(storage.getMoods()[0]);
   const [selectedQuickMood, setSelectedQuickMood] = useState<number | null>(null);
 
   const reloadData = () => {
     setStreak(storage.getStreak());
     setActivities(storage.getActivities().slice(0, 5));
     setChartData(storage.getWeeklyMoodChart());
+    setLatestMood(storage.getMoods()[0]);
   };
 
   useEffect(() => {
@@ -87,7 +93,7 @@ export const Dashboard: React.FC = () => {
             <span>Daily Grounding Space</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Welcome back, {onboarding.name || "friend"}.
+            Welcome back, {profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || onboarding.name || "friend"}.
           </h1>
           <p className="text-sm sm:text-base text-white/60">
             Take a deep breath. You are in a safe, judgment-free space.
@@ -156,6 +162,47 @@ export const Dashboard: React.FC = () => {
             <span>Open full mood check-in with notes &amp; tags</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
+        </div>
+      </div>
+
+      {/* AI Companion Banner Card */}
+      <div 
+        onClick={() => {
+          sounds.playClick();
+          navigate("/app/chat", { 
+            state: { 
+              initialPrompt: latestMood 
+                ? `I'm checking in. I recently felt ${latestMood.label} (${latestMood.emoji})` 
+                : "Hi, I'd like to talk to my wellness companion today." 
+            } 
+          });
+        }}
+        className="wellness-card p-6 sm:p-8 bg-gradient-to-r from-[#131C31] via-[#112338] to-[#00d4ff]/10 border border-[#00d4ff]/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-[#00d4ff] transition-all duration-300 group cursor-pointer shadow-lg shadow-[#00d4ff]/10"
+      >
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#00d4ff]/20 border border-[#00d4ff]/40 flex items-center justify-center text-[#00d4ff] shrink-0 group-hover:scale-110 transition-transform">
+            <Bot className="w-7 h-7" />
+          </div>
+          <div className="space-y-1 text-left">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#00d4ff]/15 text-[#00d4ff] text-[11px] font-bold">
+              <Sparkles className="w-3 h-3" />
+              <span>24/7 AI Wellness Companion</span>
+            </div>
+            <h3 className="text-xl font-bold text-white tracking-tight">
+              Talk to your companion
+            </h3>
+            <p className="text-xs sm:text-sm text-white/70 max-w-xl">
+              {latestMood 
+                ? `You recently checked in feeling ${latestMood.emoji} ${latestMood.label}. Want to explore thoughts, try a CBT reframe, or hear a calming story?`
+                : "Your supportive wellness coach is right here to listen without judgment, walk through CBT exercises, or help you relax."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-6 py-3.5 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#0088ff] text-[#0B1121] font-extrabold text-xs shrink-0 shadow-md shadow-[#00d4ff]/25 group-hover:scale-105 transition-all">
+          <MessageCircle className="w-4 h-4 fill-current" />
+          <span>Open AI Coach</span>
+          <ArrowRight className="w-4 h-4" />
         </div>
       </div>
 

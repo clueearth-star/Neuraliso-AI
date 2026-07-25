@@ -1,9 +1,25 @@
-import React, { useState } from "react";
-import { Heart, Phone, MessageSquare, MapPin, X, ShieldAlert } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Heart, Phone, MessageSquare, MapPin, X, ShieldAlert, Move } from "lucide-react";
 import { sounds } from "../lib/sounds";
+import { useDraggable } from "../hooks/useDraggable";
 
 export const CrisisModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const { isDragging, dragRef, handlers, handleClick, style } = useDraggable({
+    storageKey: "neuraliso_sos_bubble_pos",
+    defaultCorner: "bottom-right",
+    defaultOffset: { x: 24, y: 24 },
+    zIndex: 50,
+  });
+
+  useEffect(() => {
+    const handleTrigger = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener("trigger-crisis-modal", handleTrigger);
+    return () => window.removeEventListener("trigger-crisis-modal", handleTrigger);
+  }, []);
 
   const handleOpen = () => {
     sounds.playClick();
@@ -17,15 +33,24 @@ export const CrisisModal: React.FC = () => {
 
   return (
     <>
-      {/* Floating Red Heart Button - Always Visible Bottom Right */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Floating Red Heart Button - Draggable */}
+      <div
+        ref={dragRef}
+        style={style}
+        {...handlers}
+        className={`transition-shadow duration-200 select-none ${
+          isDragging ? "cursor-grabbing scale-110 z-[60] ring-2 ring-white/40 rounded-full" : "cursor-grab"
+        }`}
+      >
         <button
-          onClick={handleOpen}
-          aria-label="Immediate Crisis Help & Resources"
-          className="group relative flex items-center justify-center w-14 h-14 rounded-full bg-rose-600 text-white shadow-[0_4px_20px_rgba(244,63,94,0.5)] hover:bg-rose-500 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer animate-soft-pulse"
+          onClick={handleClick(handleOpen)}
+          aria-label="Immediate Crisis Help & Resources (Drag anywhere to reposition)"
+          title="Click for SOS Help • Drag anywhere to move"
+          className="group relative flex items-center justify-center w-14 h-14 rounded-full bg-rose-600 text-white shadow-[0_4px_20px_rgba(244,63,94,0.5)] hover:bg-rose-500 hover:scale-105 active:scale-95 transition-all duration-300 pointer-events-auto cursor-pointer animate-soft-pulse"
         >
           <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-400 rounded-full animate-ping" />
           <Heart className="w-6 h-6 fill-current text-white group-hover:scale-110 transition-transform" />
+          <Move className="w-3 h-3 text-white/70 absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       </div>
 

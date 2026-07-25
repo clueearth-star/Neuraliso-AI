@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Check, ArrowRight, ShieldCheck, Clock, Trash2, Sparkles, HelpCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { RefreshCw, Check, ArrowRight, ShieldCheck, Clock, Trash2, Sparkles, HelpCircle, Bot, MessageCircle } from "lucide-react";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { ReframeEntry } from "../types";
 
 export const ReframeView: React.FC = () => {
+  const navigate = useNavigate();
   const [reframes, setReframes] = useState<ReframeEntry[]>([]);
   
   // Form state
@@ -179,6 +181,33 @@ export const ReframeView: React.FC = () => {
               <span>Thought reframe logged successfully! Your mind is becoming more flexible.</span>
             </div>
           )}
+
+          {/* AI Guide Banner */}
+          <div 
+            onClick={() => {
+              sounds.playClick();
+              navigate("/app/chat", { 
+                state: { 
+                  initialPrompt: "Can you guide me step-by-step through a CBT thought reframe?" 
+                } 
+              });
+            }}
+            className="p-5 rounded-2xl bg-gradient-to-r from-[#131C31] to-[#00d4ff]/15 border border-[#00d4ff]/30 flex items-center justify-between gap-4 hover:border-[#00d4ff] transition-all cursor-pointer group shadow-md"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-[#00d4ff]/20 flex items-center justify-center text-[#00d4ff] shrink-0 group-hover:scale-110 transition-transform">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white">Need interactive help?</h4>
+                <p className="text-xs text-white/60">Let your AI coach walk you through the 4 steps conversationally.</p>
+              </div>
+            </div>
+            <div className="px-3.5 py-2 rounded-xl bg-[#00d4ff]/20 text-[#00d4ff] text-xs font-bold whitespace-nowrap flex items-center gap-1.5 group-hover:bg-[#00d4ff] group-hover:text-[#0B1121] transition-colors">
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>AI Guide</span>
+            </div>
+          </div>
         </form>
       </div>
 

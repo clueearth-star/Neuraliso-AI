@@ -1,33 +1,54 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { 
   Settings as SettingsIcon, 
   Moon, 
   Sun, 
   Bell, 
-  Clock, 
-  Download, 
   Trash2, 
   ShieldAlert, 
   Heart, 
   Check, 
   Volume2, 
-  VolumeX,
-  X
+  VolumeX, 
+  X,
+  User,
+  LogOut,
+  Sparkles,
+  CloudCheck,
+  Loader2,
+  LogIn,
+  UserPlus
 } from "lucide-react";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { AppSettings } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 export const SettingsView: React.FC = () => {
   const navigate = useNavigate();
+  const { user, profile, updateProfileName, signOut, syncStatus, syncMessage, isAnonymous } = useAuth();
+  
   const [settings, setSettings] = useState<AppSettings>(storage.getSettings());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
+  const [nameInput, setNameInput] = useState("");
+  const [updatingName, setUpdatingName] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+
   useEffect(() => {
-    // Apply theme
+    if (profile?.name) {
+      setNameInput(profile.name);
+    } else if (user?.user_metadata?.full_name || user?.user_metadata?.name) {
+      setNameInput(user.user_metadata.full_name || user.user_metadata.name);
+    } else {
+      const ob = storage.getOnboarding();
+      if (ob.name) setNameInput(ob.name);
+    }
+  }, [profile, user]);
+
+  useEffect(() => {
     if (settings.theme === "light") {
       document.body.classList.add("theme-light");
     } else {
@@ -49,21 +70,23 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSaveToast(false), 2000);
   };
 
-  const handleExportJSON = () => {
-    sounds.playSuccess();
-    const jsonStr = storage.exportAllDataJSON();
-    const blob = new Blob([jsonStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `neuraliso-wellness-export-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleUpdateName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nameInput.trim()) return;
+    sounds.playClick();
+    setUpdatingName(true);
+    setProfileSuccess(false);
 
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 3000);
+    try {
+      const { error } = await updateProfileName(nameInput.trim());
+      if (!error) {
+        sounds.playSuccess();
+        setProfileSuccess(true);
+        setTimeout(() => setProfileSuccess(false), 3000);
+      }
+    } finally {
+      setUpdatingName(false);
+    }
   };
 
   const handleConfirmDelete = () => {
@@ -74,18 +97,18 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10 pb-28 md:pb-12 animate-page-in text-left">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10 pb-28 md:pb-12 animate-page-in text-left font-sans">
       {/* Header */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-300 text-xs font-semibold">
           <SettingsIcon className="w-3.5 h-3.5" />
-          <span>Preferences &amp; Privacy</span>
+          <span>Preferences &amp; Account</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-serif">
           Settings
         </h1>
         <p className="text-sm sm:text-base text-white/60">
-          Customize your experience, manage daily reminders, and control your local storage data.
+          Manage your cloud account, customize daily check-in preferences, and control local data storage.
         </p>
       </div>
 
@@ -98,9 +121,121 @@ export const SettingsView: React.FC = () => {
 
       {/* Settings Sections */}
       <div className="space-y-6">
+        {/* 0. Account & Cloud Sync Section */}
+        <div className="wellness-card p-6 sm:p-8 space-y-6 border border-[#00d4ff]/20 bg-gradient-to-br from-[#00d4ff]/5 via-transparent to-transparent">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4 font-serif">
+            <User className="w-5 h-5 text-[#00d4ff]" />
+            <span>Account &amp; Cloud Backup</span>
+          </h2>
+
+          {user ? (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-black/20 border border-white/5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white">Signed in as</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#00d4ff]/15 text-[#00d4ff] text-[11px] font-bold">
+                      Verified Cloud
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/70 font-mono">{user.email}</p>
+                  <div className="flex items-center gap-1.5 pt-1 text-xs text-emerald-400">
+                    {syncStatus === "syncing" ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00d4ff]" />
+                        <span className="text-[#00d4ff]">Syncing data with cloud...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>{syncMessage || "All local data backed up to Supabase"}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    sounds.playClick();
+                    signOut();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign out</span>
+                </button>
+              </div>
+
+              {/* Profile Name Form */}
+              <form onSubmit={handleUpdateName} className="space-y-3">
+                <label className="text-xs font-semibold text-white/80 block">Your Name / Nickname</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Enter your preferred name..."
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-[#00d4ff] focus:bg-white/10 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={updatingName}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-xs shadow-md shadow-[#00d4ff]/20 hover:opacity-95 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {updatingName ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <span>Save Name</span>
+                    )}
+                  </button>
+                </div>
+                {profileSuccess && (
+                  <p className="text-xs text-emerald-400 flex items-center gap-1.5 animate-in fade-in">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Profile name updated across all devices!</span>
+                  </p>
+                )}
+              </form>
+            </div>
+          ) : (
+            <div className="p-5 rounded-2xl bg-black/20 border border-white/5 space-y-4 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 justify-center sm:justify-start">
+                    <Sparkles className="w-4 h-4 text-[#00d4ff]" />
+                    <span className="text-sm font-bold text-white">Anonymous Mode Active</span>
+                  </div>
+                  <p className="text-xs text-white/70 max-w-lg leading-relaxed">
+                    You are currently exploring without a cloud account. Your mood logs, CBT reframes, and AI chat history are saved only in this browser's local storage.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <Link
+                    to="/login"
+                    onClick={() => sounds.playClick()}
+                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-[#00d4ff]" />
+                    <span>Sign In</span>
+                  </Link>
+                  <Link
+                    to="/signup"
+                    onClick={() => sounds.playClick()}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-xs shadow-md shadow-[#00d4ff]/20 hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Sign Up</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* 1. Appearance & Theme */}
         <div className="wellness-card p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4 font-serif">
             <Sun className="w-5 h-5 text-amber-400" />
             <span>Appearance &amp; Sound</span>
           </h2>
@@ -170,7 +305,7 @@ export const SettingsView: React.FC = () => {
 
         {/* 2. Reminders & Notifications */}
         <div className="wellness-card p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4 font-serif">
             <Bell className="w-5 h-5 text-[#00d4ff]" />
             <span>Daily Check-in Reminders</span>
           </h2>
@@ -220,26 +355,18 @@ export const SettingsView: React.FC = () => {
 
         {/* 3. Data Ownership & Privacy */}
         <div className="wellness-card p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4">
-            <Download className="w-5 h-5 text-teal-400" />
-            <span>Data Ownership &amp; Storage</span>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4 font-serif">
+            <ShieldAlert className="w-5 h-5 text-teal-400" />
+            <span>Data Storage &amp; Cache</span>
           </h2>
 
           <div className="space-y-4 text-xs text-white/70 leading-relaxed bg-black/20 p-4 rounded-2xl border border-white/5">
             <p>
-              <strong>100% Local Storage:</strong> Your check-ins, CBT reframes, and settings live strictly on this browser. No servers, no passwords, no cloud sync.
+              <strong>Local Browser Cache:</strong> When signed in, your data is securely backed up to your Supabase cloud account while maintaining a lightning-fast offline local cache.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-            <button
-              onClick={handleExportJSON}
-              className="w-full sm:w-auto px-6 py-3 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-xs transition-all shadow-md shadow-[#00d4ff]/20 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>{downloaded ? "JSON File Downloaded!" : "Export All Data (JSON)"}</span>
-            </button>
-
+          <div className="flex justify-end pt-2">
             <button
               onClick={() => {
                 sounds.playClick();
@@ -258,7 +385,7 @@ export const SettingsView: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-[#00d4ff]/10 border border-[#00d4ff]/20 flex items-center justify-center text-[#00d4ff] mx-auto">
             <Heart className="w-6 h-6 fill-current" />
           </div>
-          <h3 className="text-base font-bold text-white">Neuraliso Wellness Space</h3>
+          <h3 className="text-base font-bold text-white font-serif">Neuraliso Wellness Space</h3>
           <p className="text-xs text-white/50 max-w-sm mx-auto">
             Version 2.0.0 &bull; Built with care for emotional wellness, mindfulness, and tranquility.
           </p>

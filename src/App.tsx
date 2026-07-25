@@ -12,6 +12,13 @@ import { SleepSoundsView } from "./components/SleepSoundsView";
 import { ReframeView } from "./components/ReframeView";
 import { ProgressView } from "./components/ProgressView";
 import { SettingsView } from "./components/SettingsView";
+import { ChatView } from "./components/ChatView";
+import { FloatingChatButton } from "./components/FloatingChatButton";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { Login } from "./components/auth/Login";
+import { Signup } from "./components/auth/Signup";
+import { ForgotPassword } from "./components/auth/ForgotPassword";
+import { ResetPassword } from "./components/auth/ResetPassword";
 
 const AppLayout: React.FC = () => {
   return (
@@ -20,6 +27,7 @@ const AppLayout: React.FC = () => {
       <main className="flex-1">
         <Outlet />
       </main>
+      <FloatingChatButton />
     </div>
   );
 };
@@ -34,15 +42,23 @@ export function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
           
-          <Route path="/app" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="mood" element={<MoodCheckView />} />
-            <Route path="breathe" element={<BreatheView />} />
-            <Route path="sleep" element={<SleepSoundsView />} />
-            <Route path="reframe" element={<ReframeView />} />
-            <Route path="progress" element={<ProgressView />} />
-            <Route path="settings" element={<SettingsView />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/app" element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="mood" element={<MoodCheckView />} />
+              <Route path="breathe" element={<BreatheView />} />
+              <Route path="sleep" element={<SleepSoundsView />} />
+              <Route path="reframe" element={<ReframeView />} />
+              <Route path="progress" element={<ProgressView />} />
+              <Route path="settings" element={<SettingsView />} />
+              <Route path="chat" element={<ChatView />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -53,3 +69,4 @@ export function App() {
 }
 
 export default App;
+

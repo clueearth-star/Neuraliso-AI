@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Smile, Check, Tag, Clock, TrendingUp, Sparkles, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Smile, Check, Tag, Clock, TrendingUp, Sparkles, Trash2, Bot, MessageCircle } from "lucide-react";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -14,6 +15,7 @@ import { sounds } from "../lib/sounds";
 import { MoodEntry } from "../types";
 
 export const MoodCheckView: React.FC = () => {
+  const navigate = useNavigate();
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   
@@ -22,6 +24,7 @@ export const MoodCheckView: React.FC = () => {
   const [note, setNote] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [lastLogged, setLastLogged] = useState<{ label: string; emoji: string; tags: string[] } | null>(null);
 
   const emojis = [
     { score: 1, emoji: "😢", label: "Sad" },
@@ -64,6 +67,7 @@ export const MoodCheckView: React.FC = () => {
       tags: selectedTags,
     });
 
+    setLastLogged({ label: currentEmoji.label, emoji: currentEmoji.emoji, tags: selectedTags });
     setNote("");
     setSelectedTags([]);
     setShowSuccess(true);
@@ -71,7 +75,7 @@ export const MoodCheckView: React.FC = () => {
 
     setTimeout(() => {
       setShowSuccess(false);
-    }, 3000);
+    }, 6000);
   };
 
   const handleDeleteEntry = (id: string) => {
@@ -187,9 +191,29 @@ export const MoodCheckView: React.FC = () => {
             </div>
 
             {showSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 animate-page-in">
-                <Check className="w-4 h-4" />
-                <span>Your check-in has been saved securely to local storage.</span>
+              <div className="space-y-3 animate-page-in">
+                <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4" />
+                  <span>Your check-in has been saved securely to local storage.</span>
+                </div>
+
+                {lastLogged && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sounds.playClick();
+                      navigate("/app/chat", {
+                        state: {
+                          initialPrompt: `I'm feeling ${lastLogged.label} (${lastLogged.emoji}) because ${lastLogged.tags.length > 0 ? lastLogged.tags.join(", ") : "of how things are going today"}. Can we talk through it?`
+                        }
+                      });
+                    }}
+                    className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#131C31] to-[#00d4ff]/20 hover:from-[#1A2338] hover:to-[#00d4ff]/30 border border-[#00d4ff]/40 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#00d4ff]/15 transition-all group cursor-pointer"
+                  >
+                    <Bot className="w-4 h-4 text-[#00d4ff] group-hover:scale-110 transition-transform" />
+                    <span>Talk through how you&apos;re feeling with AI</span>
+                  </button>
+                )}
               </div>
             )}
           </form>

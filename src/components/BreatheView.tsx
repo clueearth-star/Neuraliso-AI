@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Wind, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Wind, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Bot, MessageCircle } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
 
@@ -44,6 +45,7 @@ const BREATH_MODES: BreathMode[] = [
 ];
 
 export const BreatheView: React.FC = () => {
+  const navigate = useNavigate();
   const [activeMode, setActiveMode] = useState<BreathMode>(BREATH_MODES[0]);
   const [isRunning, setIsRunning] = useState(false);
   const [phaseIndex, setPhaseIndex] = useState(0);
@@ -266,6 +268,26 @@ export const BreatheView: React.FC = () => {
             <span className="text-lg font-mono font-bold text-[#00d4ff]">{breathsCompleted}</span>
           </div>
         </div>
+
+        {/* AI Reflection Button when breaths are completed */}
+        {breathsCompleted > 0 && (
+          <div className="pt-2 animate-fade-in">
+            <button
+              onClick={() => {
+                sounds.playClick();
+                navigate("/app/chat", {
+                  state: {
+                    initialPrompt: `I just finished ${breathsCompleted} breath cycles of ${activeMode.name}. How do you feel after that session, and how can I hold onto this calm?`
+                  }
+                });
+              }}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#131C31] to-[#00d4ff]/20 hover:from-[#1A2338] hover:to-[#00d4ff]/30 border border-[#00d4ff]/40 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#00d4ff]/15 transition-all group cursor-pointer"
+            >
+              <Bot className="w-4 h-4 text-[#00d4ff] group-hover:scale-110 transition-transform" />
+              <span>How do you feel after that session? Talk with AI</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

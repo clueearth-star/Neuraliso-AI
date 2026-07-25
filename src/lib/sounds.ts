@@ -10,6 +10,10 @@ class SoundEngine {
   private isMuted: boolean = false;
   private soundLog: Array<{ id: string; name: string; timestamp: string }> = [];
 
+  private activeSleepSource: AudioNode[] = [];
+  private activeSleepGain: GainNode | null = null;
+  private currentSleepType: string | null = null;
+
   constructor() {
     // Load mute state from localStorage
     const savedMute = localStorage.getItem("neuraliso_sounds_muted");
@@ -31,6 +35,111 @@ class SoundEngine {
     if (this.ctx && this.ctx.state === "suspended") {
       this.ctx.resume();
     }
+  }
+
+  public startSleepSound(type: "rain" | "white" | "brown" | "binaural", volume: number = 0.5) {
+    this.init();
+    this.stopSleepSound();
+    if (!this.ctx || !this.masterGain) return;
+
+    this.currentSleepType = type;
+    this.activeSleepGain = this.ctx.createGain();
+    this.activeSleepGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+    this.activeSleepGain.gain.linearRampToValueAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime + 1.5);
+    this.activeSleepGain.connect(this.masterGain);
+
+    if (type === "white" || type === "brown" || type === "rain") {
+      const bufferSize = 2 * this.ctx.sampleRate; // 2 seconds buffer
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+
+      if (type === "white") {
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+      } else if (type === "brown" || type === "rain") {
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          output[i] = (lastOut + 0.02 * white) / 1.02;
+          lastOut = output[i];
+          output[i] *= 3.5; // boost volume
+        }
+      }
+
+      const whiteNoise = this.ctx.createBufferSource();
+      whiteNoise.buffer = noiseBuffer;
+      whiteNoise.loop = true;
+
+      if (type === "rain") {
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(850, this.ctx.currentTime);
+        whiteNoise.connect(filter);
+        filter.connect(this.activeSleepGain);
+      } else {
+        whiteNoise.connect(this.activeSleepGain);
+      }
+
+      whiteNoise.start();
+      this.activeSleepSource.push(whiteNoise);
+    } else if (type === "binaural") {
+      // 432 Hz fundamental theta wave binaural beat (Left: 216Hz, Right: 222Hz = 6Hz theta frequency)
+      const merger = this.ctx.createChannelMerger(2);
+      
+      const oscLeft = this.ctx.createOscillator();
+      oscLeft.type = "sine";
+      oscLeft.frequency.setValueAtTime(216, this.ctx.currentTime);
+      oscLeft.connect(merger, 0, 0);
+
+      const oscRight = this.ctx.createOscillator();
+      oscRight.type = "sine";
+      oscRight.frequency.setValueAtTime(222, this.ctx.currentTime);
+      oscRight.connect(merger, 0, 1);
+
+      // Add a warm sub-drone at 108Hz
+      const subOsc = this.ctx.createOscillator();
+      subOsc.type = "sine";
+      subOsc.frequency.setValueAtTime(108, this.ctx.currentTime);
+      const subGain = this.ctx.createGain();
+      subGain.gain.value = 0.3;
+      subOsc.connect(subGain);
+      subGain.connect(this.activeSleepGain);
+
+      merger.connect(this.activeSleepGain);
+
+      oscLeft.start();
+      oscRight.start();
+      subOsc.start();
+      this.activeSleepSource.push(oscLeft, oscRight, subOsc);
+    }
+  }
+
+  public setSleepVolume(volume: number) {
+    if (this.activeSleepGain && this.ctx) {
+      this.activeSleepGain.gain.setTargetAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime, 0.1);
+    }
+  }
+
+  public stopSleepSound() {
+    this.activeSleepSource.forEach((src) => {
+      try {
+        if ("stop" in src) (src as any).stop();
+        src.disconnect();
+      } catch {}
+    });
+    this.activeSleepSource = [];
+    if (this.activeSleepGain) {
+      try {
+        this.activeSleepGain.disconnect();
+      } catch {}
+      this.activeSleepGain = null;
+    }
+    this.currentSleepType = null;
+  }
+
+  public getActiveSleepSound(): string | null {
+    return this.currentSleepType;
   }
 
   public getMuteState(): boolean {

@@ -1,369 +1,308 @@
-import React, { useState } from "react";
-import { JournalEntry } from "../types";
-import { SadMoodIcon, AnxiousMoodIcon, OverwhelmedMoodIcon, LonelyMoodIcon } from "./Icons";
+import React, { useState, useEffect } from "react";
+import { Smile, Check, Tag, Clock, TrendingUp, Sparkles, Trash2 } from "lucide-react";
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  Tooltip,
+  CartesianGrid 
+} from "recharts";
+import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
+import { MoodEntry } from "../types";
 
-interface MoodCheckViewProps {
-  onSaveEntry: (entry: JournalEntry) => void;
-  onNavigate: (view: any) => void;
-}
+export const MoodCheckView: React.FC = () => {
+  const [moods, setMoods] = useState<MoodEntry[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  
+  // Form State
+  const [selectedScore, setSelectedScore] = useState<number>(3);
+  const [note, setNote] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-export const MoodCheckView: React.FC<MoodCheckViewProps> = ({ onSaveEntry, onNavigate }) => {
-  const [selectedMood, setSelectedMood] = useState<"sad" | "anxious" | "overwhelmed" | "lonely" | "neutral" | "happy" | null>(null);
-  const [energyLevel, setEnergyLevel] = useState(5);
-  const [personalNote, setPersonalNote] = useState("");
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const emojis = [
+    { score: 1, emoji: "😢", label: "Sad" },
+    { score: 2, emoji: "😕", label: "Down" },
+    { score: 3, emoji: "😐", label: "Okay" },
+    { score: 4, emoji: "🙂", label: "Good" },
+    { score: 5, emoji: "😊", label: "Great" },
+  ];
 
-  // Feature #15: CBT Thought Record Journal Template states
-  const [journalTemplate, setJournalTemplate] = useState<"classic" | "cbt">("classic");
-  const [cbtSituation, setCbtSituation] = useState("");
-  const [cbtAutomaticThoughts, setCbtAutomaticThoughts] = useState("");
-  const [cbtEmotions, setCbtEmotions] = useState("");
-  const [cbtEvidenceFor, setCbtEvidenceFor] = useState("");
-  const [cbtEvidenceAgainst, setCbtEvidenceAgainst] = useState("");
-  const [cbtRationalAlternative, setCbtRationalAlternative] = useState("");
+  const availableTags = ["Anxious", "Tired", "Stressed", "Happy", "Calm", "Overwhelmed"];
 
-  const moodDetails = {
-    sad: {
-      label: "Gentle / Sad",
-      icon: <SadMoodIcon size={40} className="text-blue-500" />,
-      themeColor: "border-blue-200 bg-blue-50/40 text-blue-900",
-      encouragement: "It is okay to not be okay. Healing is not a linear climb; today is simply a gentle rest day.",
-      duration: "10 mins",
-      benefits: "Serotonin restoration & cortisol stabilization",
-      plan: ["Open curtains for direct sunlight", "Drink a large glass of refreshing water", "Listen to a comforting ambient audio track"]
-    },
-    anxious: {
-      label: "Uneasy / Anxious",
-      icon: <AnxiousMoodIcon size={40} className="text-amber-500 animate-pulse-slow" />,
-      themeColor: "border-amber-200 bg-amber-50/40 text-amber-900",
-      encouragement: "Your anxiety is an emergency alarm, not a prophecy. You are safe in this physical moment.",
-      duration: "15 mins",
-      benefits: "Vagus nerve stimulation & autonomic balance",
-      plan: ["Perform cold water face splash routine", "Complete 3 cycles of 4-7-8 breathing", "Take a short, silent physical walk outside"]
-    },
-    overwhelmed: {
-      label: "Scattered / Overwhelmed",
-      icon: <OverwhelmedMoodIcon size={40} className="text-red-500" />,
-      themeColor: "border-red-200 bg-red-50/40 text-red-900",
-      encouragement: "Close your eyes. You do not have to conquer the mountain. Just focus on your next single breath.",
-      duration: "8 mins",
-      benefits: "Prefrontal cortex regulation & cognitive cooling",
-      plan: ["Write down the single most urgent task", "Stretch your neck and drop your shoulders", "Unclench your jaw and write one raw thought down"]
-    },
-    lonely: {
-      label: "Isolated / Lonely",
-      icon: <LonelyMoodIcon size={40} className="text-purple-500" />,
-      themeColor: "border-purple-200 bg-purple-50/40 text-purple-900",
-      encouragement: "You are not alone in feeling lonely. Your solitude can be a sanctuary to nourish your self-parenting.",
-      duration: "20 mins",
-      benefits: "Oxytocin trigger & social brain calibration",
-      plan: ["Send a tiny supportive message to someone", "Watch a comforting movie scene or comfort show", "Open windows and check community discussions online"]
-    },
-    neutral: {
-      label: "Balanced / Neutral",
-      icon: <span className="text-3xl">😐</span>,
-      themeColor: "border-gray-200 bg-gray-50/40 text-gray-900",
-      encouragement: "Appreciate the quiet beauty of ordinary balance. Every steady day builds a resilient nervous system base.",
-      duration: "5 mins",
-      benefits: "Mindfulness anchoring & peace observation",
-      plan: ["Take 3 conscious quiet deep sighs", "Water a plant or look at sky colors", "Type down one sensory gratitude item in note"]
-    },
-    happy: {
-      label: "Radiant / Joyful",
-      icon: <span className="text-3xl">🌸</span>,
-      themeColor: "border-green-200 bg-green-50/40 text-green-900",
-      encouragement: "Savor this warmth fully. Fill your emotional cup so it overflows for rainy days to come.",
-      duration: "5 mins",
-      benefits: "Dopamine integration & neuroplastic feedback",
-      plan: ["Doodle or dance for half a minute", "Log this cheerful moment to reflect on later", "Share a quiet smile with yourself in the mirror"]
+  const reloadData = () => {
+    setMoods(storage.getMoods());
+    setChartData(storage.getWeeklyMoodChart());
+  };
+
+  useEffect(() => {
+    reloadData();
+  }, []);
+
+  const toggleTag = (tag: string) => {
+    sounds.playClick();
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter((t) => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
     }
   };
 
-  const handleSave = () => {
-    if (!selectedMood) return;
-
-    let compiledNote = personalNote;
-    if (journalTemplate === "cbt") {
-      compiledNote = `
-🧠 [CBT THOUGHT RECORD]
-• Situation: ${cbtSituation || "N/A"}
-• Automatic Negative Thoughts: ${cbtAutomaticThoughts || "N/A"}
-• Associated Emotions: ${cbtEmotions || "N/A"}
-• Support Evidence: ${cbtEvidenceFor || "N/A"}
-• Disconfirming Evidence: ${cbtEvidenceAgainst || "N/A"}
-• Rational Reframe Mantra: ${cbtRationalAlternative || "N/A"}
-      `.trim();
-    }
-
-    const currentPlan = moodDetails[selectedMood].plan;
-    const newEntry: JournalEntry = {
-      id: "entry-" + Date.now(),
-      date: new Date().toLocaleDateString([], { month: "short", day: "numeric" }),
-      mood: selectedMood,
-      stress: 10 - energyLevel, // Inverse estimation representation
-      energy: energyLevel,
-      note: compiledNote,
-      actionPlan: currentPlan
-    };
-
-    onSaveEntry(newEntry);
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
     sounds.playSuccess();
-    setSavedSuccess(true);
+    const currentEmoji = emojis.find((item) => item.score === selectedScore) || emojis[2];
+    
+    storage.saveMood({
+      score: selectedScore,
+      emoji: currentEmoji.emoji,
+      label: currentEmoji.label,
+      note: note.trim(),
+      tags: selectedTags,
+    });
+
+    setNote("");
+    setSelectedTags([]);
+    setShowSuccess(true);
+    reloadData();
+
     setTimeout(() => {
-      onNavigate("home");
-    }, 2200);
+      setShowSuccess(false);
+    }, 3000);
+  };
+
+  const handleDeleteEntry = (id: string) => {
+    sounds.playClick();
+    const updated = moods.filter((m) => m.id !== id);
+    localStorage.setItem("neuraliso_moods_v2", JSON.stringify(updated));
+    reloadData();
   };
 
   return (
-    <div id="mood-check-view" className="pb-24 space-y-6 max-w-xl mx-auto px-1 animate-fade-in">
-      
-      {/* SUCCESS OVERLAY */}
-      {savedSuccess ? (
-        <div id="saved-success-feedback" className="wellness-card p-10 text-center space-y-5">
-          <span className="text-4xl animate-bounce inline-block">✨</span>
-          <h3 className="text-2xl font-serif italic text-deep-sage">Wellness Log Anchored</h3>
-          <p className="text-sm text-muted-text max-w-xs mx-auto leading-relaxed">
-            Your current emotional state, energy metric, and action steps have been securely recorded in local storage database. Let's head home to look at your insights.
-          </p>
-          <div className="w-12 h-1 bg-primary-sage/35 rounded-full mx-auto animate-pulse" />
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-12 pb-28 md:pb-12 animate-page-in text-left">
+      {/* Header */}
+      <div className="space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
+          <Smile className="w-3.5 h-3.5" />
+          <span>Emotional Awareness</span>
         </div>
-      ) : (
-        <>
-          {/* Welcome Screen */}
-          <div className="text-center space-y-1 mt-4">
-            <h2 className="text-3xl font-serif italic text-dark-text">How are you feeling?</h2>
-            <p className="text-xs text-muted-text">
-              Select the emotional frequency that matches your internal weather right now.
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          Mood Check-in
+        </h1>
+        <p className="text-sm sm:text-base text-white/60">
+          Take a moment to check in with yourself. Name your feelings without judgment.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Form (7 Cols) */}
+        <div className="lg:col-span-7 wellness-card p-6 sm:p-8 space-y-8">
+          <form onSubmit={handleSave} className="space-y-8">
+            {/* 1. Emoji Faces */}
+            <div className="space-y-4">
+              <label className="text-sm font-bold text-white block">
+                1. How are you feeling right now?
+              </label>
+              <div className="grid grid-cols-5 gap-2 sm:gap-4">
+                {emojis.map((item) => {
+                  const isSelected = selectedScore === item.score;
+                  return (
+                    <button
+                      type="button"
+                      key={item.score}
+                      onClick={() => {
+                        sounds.playClick();
+                        setSelectedScore(item.score);
+                      }}
+                      className={`flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl transition-all duration-300 cursor-pointer ${
+                        isSelected
+                          ? "bg-amber-500/20 border-2 border-amber-400 scale-105 shadow-lg shadow-amber-500/20"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10 hover:scale-102"
+                      }`}
+                    >
+                      <span className="text-3xl sm:text-4xl block">{item.emoji}</span>
+                      <span className="text-xs font-semibold text-white/90">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Optional Note Area */}
+            <div className="space-y-3">
+              <label htmlFor="mood-note" className="text-sm font-bold text-white flex items-center justify-between">
+                <span>2. What&apos;s on your mind?</span>
+                <span className="text-xs font-normal text-white/40">Optional reflection</span>
+              </label>
+              <textarea
+                id="mood-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Write whatever is in your thoughts. Your journal is 100% private and stored on your device..."
+                rows={3}
+                className="w-full text-sm leading-relaxed"
+              />
+            </div>
+
+            {/* 3. Tag Selector */}
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-white flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-[#00d4ff]" />
+                <span>3. Select emotional tags (multi-select):</span>
+              </label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {availableTags.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-[#00d4ff] text-[#0B1121] shadow-md shadow-[#00d4ff]/30 scale-105"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10 text-white/80"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      <span>{tag}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                className="w-full py-4 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-base hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#00d4ff]/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Save Check-in</span>
+                <Sparkles className="w-5 h-5" />
+              </button>
+            </div>
+
+            {showSuccess && (
+              <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 animate-page-in">
+                <Check className="w-4 h-4" />
+                <span>Your check-in has been saved securely to local storage.</span>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Right 7-day Chart (5 Cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="wellness-card p-6 sm:p-8 space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-[#00d4ff]" />
+                <span>7-Day Mood Trend</span>
+              </h2>
+              <p className="text-xs text-white/50 mt-0.5">Average daily mood score (1 to 5)</p>
+            </div>
+
+            <div className="h-56 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="day" stroke="rgba(255,255,255,0.4)" fontSize={12} tickLine={false} />
+                  <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} stroke="rgba(255,255,255,0.4)" fontSize={12} tickLine={false} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const val = payload[0].value;
+                        return (
+                          <div className="bg-[#1A2338] border border-white/20 p-3 rounded-xl shadow-xl text-xs space-y-1">
+                            <p className="font-bold text-white">{label}</p>
+                            <p className="text-[#00d4ff]">
+                              Score: {val !== null ? `${val} / 5` : "No entry"}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="#00d4ff" strokeWidth={3} dot={{ r: 5, fill: "#00d4ff" }} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* History List Below */}
+      <div className="space-y-6 pt-4">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Clock className="w-6 h-6 text-amber-400" />
+            <span>Check-in History</span>
+          </h2>
+          <span className="text-xs font-bold text-white/50 bg-white/5 px-3 py-1 rounded-full">
+            {moods.length} {moods.length === 1 ? "entry" : "entries"} logged
+          </span>
+        </div>
+
+        {moods.length === 0 ? (
+          <div className="wellness-card p-12 text-center space-y-3">
+            <Smile className="w-10 h-10 text-white/30 mx-auto" />
+            <h3 className="text-base font-bold text-white">Your journey starts here. How are you feeling?</h3>
+            <p className="text-xs text-white/50 max-w-sm mx-auto">
+              Use the form above to record your first mood check-in. You can return anytime to see your history.
             </p>
           </div>
-
-          {/* Grid of Mood Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            {(Object.keys(moodDetails) as Array<keyof typeof moodDetails>).map((tempMood) => {
-              const details = moodDetails[tempMood];
-              const isSelected = selectedMood === tempMood;
-
-              return (
-                <button
-                  key={tempMood}
-                  id={`mood-check-card-${tempMood}`}
-                  onClick={() => setSelectedMood(tempMood)}
-                  className={`p-4 rounded-[28px] text-left flex flex-col justify-between items-start h-36 transition-all duration-300 ${
-                    isSelected 
-                      ? "neu-inset text-dark-text scale-95 border-2 border-primary-sage/40" 
-                      : "neu-flat-sm text-dark-text hover:scale-[1.01]"
-                  }`}
-                >
-                  <div className="flex justify-between items-center w-full">
-                    <span className="p-2 neu-inset-sm shrink-0">
-                      {details.icon}
-                    </span>
-                    {isSelected && (
-                      <span className="text-[10px] font-bold text-primary-sage px-2.5 py-0.5 neu-inset-sm">
-                        Selected
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-muted-text font-mono tracking-tight block">FREQUENCY</span>
-                    <span className="font-semibold text-sm text-dark-text mt-0.5 block">{details.label}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* DYNAMIC PLAN GENERATOR SECTION */}
-          {selectedMood && (
-            <div id="dynamic-action-plan-generator" className="wellness-card p-6 space-y-5 animate-slide-up">
-              
-              {/* Encouragement header */}
-              <div className="p-4 neu-inset">
-                <h4 className="font-serif italic text-sm font-semibold mb-1 text-primary-sage">Compassion Prescription</h4>
-                <p className="text-xs leading-relaxed font-sans text-dark-text/90">{moodDetails[selectedMood].encouragement}</p>
-              </div>
-
-              {/* Specs Grid */}
-              <div className="grid grid-cols-2 gap-3 text-xs p-3.5 neu-inset font-sans">
-                <div>
-                  <span className="text-muted-text block">Suggested Practice:</span>
-                  <span className="font-semibold text-dark-text">{moodDetails[selectedMood].duration} duration</span>
-                </div>
-                <div>
-                  <span className="text-muted-text block">Biological Benefit:</span>
-                  <span className="font-semibold text-dark-text">{moodDetails[selectedMood].benefits}</span>
-                </div>
-              </div>
-
-              {/* Action plan checklist */}
-              <div className="space-y-2.5">
-                <span className="text-xs font-bold text-dark-text block">Actionable Rebalancing Checklist:</span>
-                <div className="space-y-3">
-                  {moodDetails[selectedMood].plan.map((step, idx) => (
-                    <div key={idx} className="flex items-start gap-3 p-3.5 neu-inset-sm text-xs text-dark-text">
-                      <span className="bg-primary-sage text-white w-5 h-5 rounded-full flex items-center justify-center font-mono text-[9px] shrink-0 font-bold">
-                        {idx + 1}
-                      </span>
-                      <span className="leading-tight pt-0.5">{step}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Active Energy Meter slider */}
-              <div className="space-y-3 border-t border-soft-green/15 pt-4">
-                <label className="text-xs font-bold text-dark-text flex justify-between items-center">
-                  <span>How is your physical energy level?</span>
-                  <span className="font-mono text-primary-sage font-bold">{energyLevel}/10</span>
-                </label>
-                <div className="px-1">
-                  <input
-                    id="energy-range-input"
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={energyLevel}
-                    onChange={(e) => setEnergyLevel(Number(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-text font-mono">
-                  <span>1 (Exhausted)</span>
-                  <span>10 (Energetic)</span>
-                </div>
-              </div>
-
-              {/* Personal Reflection Note */}
-              <div className="space-y-2.5">
-                <label className="text-xs font-bold text-dark-text flex justify-between items-center">
-                  <span>Reflection Pattern:</span>
-                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <button
-                      type="button"
-                      id="use-classic-journal-btn"
-                      onClick={() => setJournalTemplate("classic")}
-                      className={`text-[9px] px-2 py-1 font-mono uppercase rounded font-bold transition-all ${
-                        journalTemplate === "classic"
-                          ? "bg-primary-sage text-white"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      Classic diary
-                    </button>
-                    <button
-                      type="button"
-                      id="use-cbt-journal-btn"
-                      onClick={() => setJournalTemplate("cbt")}
-                      className={`text-[9px] px-2 py-1 font-mono uppercase rounded font-bold transition-all ${
-                        journalTemplate === "cbt"
-                          ? "bg-primary-sage text-white"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      CBT Thought Record
-                    </button>
-                  </div>
-                </label>
-
-                {journalTemplate === "classic" ? (
-                  <textarea
-                    id="moodcheck-notes"
-                    value={personalNote}
-                    onChange={(e) => setPersonalNote(e.target.value)}
-                    placeholder="Record an honest thought, a raw gratitude, or describe the clouds..."
-                    className="w-full p-3.5 neu-field text-xs placeholder-muted-text h-24 text-dark-text resize-none"
-                  />
-                ) : (
-                  <div className="space-y-3.5 p-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl animate-fade-in text-left">
-                    <span className="text-[9.5px] bg-teal-50 text-teal-900 border border-teal-100 p-2 rounded block leading-normal font-serif italic mb-2">
-                       "Cognitive Behavioral Therapy helps identify automatic stress filters. Fill out this guided record to dismantle negative thought spirals step-by-step."
-                    </span>
-                    
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-slate-700 block uppercase">1. The Triggering Situation:</span>
-                      <input
-                        id="cbt-input-situation"
-                        type="text"
-                        placeholder="e.g., Left on read, project delay noticed..."
-                        value={cbtSituation}
-                        onChange={(e) => setCbtSituation(e.target.value)}
-                        className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-slate-700 block uppercase">2. Automatic Negative Thought:</span>
-                      <textarea
-                        id="cbt-input-thought"
-                        placeholder="What mean thing is your brain saying? 'I am completely useless and incompetent.'"
-                        value={cbtAutomaticThoughts}
-                        onChange={(e) => setCbtAutomaticThoughts(e.target.value)}
-                        className="w-full p-2.5 text-xs border border-slate-200 rounded-lg h-14 resize-none focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <span className="text-[10px] font-bold text-slate-700 block uppercase">3. Associated Emotions:</span>
-                      <input
-                        id="cbt-input-emotions"
-                        type="text"
-                        placeholder="e.g., Intense panic, heavy shame, deep worry..."
-                        value={cbtEmotions}
-                        onChange={(e) => setCbtEmotions(e.target.value)}
-                        className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-semibold text-slate-700 block uppercase">4. Evidence For Thought:</span>
-                        <textarea
-                          id="cbt-input-evidence-for"
-                          placeholder="What objective facts support it?"
-                          value={cbtEvidenceFor}
-                          onChange={(e) => setCbtEvidenceFor(e.target.value)}
-                          className="w-full p-2 text-[10px] border border-slate-200 rounded-lg h-12 resize-none focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                        />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {moods.map((entry) => (
+              <div key={entry.id} className="wellness-card p-5 space-y-3 relative group">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl bg-black/30 p-2 rounded-2xl block">{entry.emoji}</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-white">{entry.label}</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/80">
+                          Score {entry.score}/5
+                        </span>
                       </div>
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-semibold text-slate-700 block uppercase">5. Evidence Against Thought:</span>
-                        <textarea
-                          id="cbt-input-evidence-against"
-                          placeholder="What facts contradict this?"
-                          value={cbtEvidenceAgainst}
-                          onChange={(e) => setCbtEvidenceAgainst(e.target.value)}
-                          className="w-full p-2 text-[10px] border border-slate-200 rounded-lg h-12 resize-none focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                        />
-                      </div>
+                      <span className="text-xs text-white/40 block mt-0.5">{entry.date}</span>
                     </div>
+                  </div>
 
-                    <div className="space-y-1.5 mt-2">
-                      <span className="text-[10px] font-bold text-slate-700 block uppercase">6. Rational Reframe Mantra:</span>
-                      <textarea
-                        id="cbt-input-reframe"
-                        placeholder="Write a balanced perspective. 'This is one setback. I am practicing and learning.'"
-                        value={cbtRationalAlternative}
-                        onChange={(e) => setCbtRationalAlternative(e.target.value)}
-                        className="w-full p-2.5 text-xs border border-slate-200 rounded-lg h-14 resize-none focus:outline-none focus:ring-1 focus:ring-primary-sage bg-white"
-                      />
-                    </div>
+                  <button
+                    onClick={() => handleDeleteEntry(entry.id)}
+                    aria-label="Delete entry"
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-white/40 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {entry.note && (
+                  <p className="text-xs text-white/80 leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5 italic">
+                    &quot;{entry.note}&quot;
+                  </p>
+                )}
+
+                {entry.tags && entry.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {entry.tags.map((t, idx) => (
+                      <span key={idx} className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/20">
+                        #{t}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {/* Action Save button */}
-              <button
-                id="save-wellness-checkin-btn"
-                onClick={handleSave}
-                className="w-full neu-btn py-3.5 rounded-apple-pill font-bold shadow-lg transition-all text-xs text-center cursor-pointer"
-              >
-                Save check-in ✨
-              </button>
-            </div>
-          )}
-        </>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

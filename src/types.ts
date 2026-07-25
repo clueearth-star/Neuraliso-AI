@@ -1,28 +1,51 @@
-export interface Message {
+export interface MoodEntry {
   id: string;
-  sender: "user" | "bot";
-  text: string;
-  timestamp: string;
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+  score: number; // 1 to 5
+  emoji: string;
+  label: string;
+  note?: string;
+  tags: string[];
 }
 
-export type ActiveView = "home" | "chat" | "sos" | "hotline" | "profile" | "moodCheck" | "relief" | "reviews" | "neuroSkeletons" | "breathe";
+export interface ReframeEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  timestamp: number;
+  situation: string;
+  automaticThought: string;
+  beliefPercent: number; // 0 to 100
+  balancedThought: string;
+}
 
-export type CompanionTone = "warm" | "calm" | "direct";
+export interface SleepSoundItem {
+  id: "rain" | "white" | "brown" | "binaural";
+  name: string;
+  description: string;
+  icon: string;
+  volume: number; // 0 to 1
+}
 
-export interface JournalEntry {
+export interface AppSettings {
+  theme: "dark" | "light";
+  reminderTime: string; // e.g. "20:00"
+  notifications: boolean;
+  soundEnabled: boolean;
+}
+
+export interface OnboardingState {
+  completed: boolean;
+  name: string;
+  goal: "calm" | "sleep" | "focus" | "explore" | "";
+}
+
+export interface ActivityLog {
   id: string;
   date: string;
-  mood: "sad" | "anxious" | "overwhelmed" | "lonely" | "neutral" | "happy";
-  stress: number; // 1 to 10
-  energy: number; // 1 to 10
-  note: string;
-  actionPlan: string[];
+  timestamp: number;
+  type: "mood" | "breathe" | "sleep" | "reframe";
+  title: string;
+  description: string;
 }
 
-export interface HotlineContact {
-  name: string;
-  phone: string;
-  description: string;
-  isText?: boolean;
-  link?: string;
-}

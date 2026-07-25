@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { JournalEntry } from "../types";
 import { SadMoodIcon, AnxiousMoodIcon, OverwhelmedMoodIcon, LonelyMoodIcon } from "./Icons";
+import { sounds } from "../lib/sounds";
 
 interface MoodCheckViewProps {
   onSaveEntry: (entry: JournalEntry) => void;
@@ -107,6 +108,7 @@ export const MoodCheckView: React.FC<MoodCheckViewProps> = ({ onSaveEntry, onNav
     };
 
     onSaveEntry(newEntry);
+    sounds.playSuccess();
     setSavedSuccess(true);
     setTimeout(() => {
       onNavigate("home");
@@ -354,9 +356,9 @@ export const MoodCheckView: React.FC<MoodCheckViewProps> = ({ onSaveEntry, onNav
               <button
                 id="save-wellness-checkin-btn"
                 onClick={handleSave}
-                className="w-full bg-primary-sage text-white py-3.5 rounded-full font-bold shadow-md shadow-primary-sage/10 hover:bg-deep-sage transition-all active:scale-95 text-xs text-center"
+                className="w-full neu-btn py-3.5 rounded-apple-pill font-bold shadow-lg transition-all text-xs text-center cursor-pointer"
               >
-                Log Check-In & Activate Action Plan ✨
+                Save check-in ✨
               </button>
             </div>
           )}

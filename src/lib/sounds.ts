@@ -59,29 +59,29 @@ class SoundEngine {
   }
 
   /**
-   * Play a clean, subtle click sound for buttons and nav.
+   * Play a clean, soft low-frequency pop for buttons and nav (spa atmosphere).
    */
   public playClick() {
     this.init();
     if (this.isMuted || !this.ctx || !this.masterGain) return;
-    this.logSound("Button Touch - Click");
+    this.logSound("Button Touch - Soft Pop");
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
     osc.type = "sine";
-    // Quick pitch envelope going down
-    osc.frequency.setValueAtTime(450, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.08);
+    // Soft low-frequency pop going smoothly down
+    osc.frequency.setValueAtTime(280, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.07);
 
-    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.07);
 
     osc.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.1);
+    osc.stop(this.ctx.currentTime + 0.09);
   }
 
   /**
@@ -96,29 +96,30 @@ class SoundEngine {
     const gain = this.ctx.createGain();
 
     osc.type = "sine";
-    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(240, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(480, this.ctx.currentTime + 0.1);
 
-    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
 
     osc.connect(gain);
     gain.connect(this.masterGain);
 
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.15);
+    osc.stop(this.ctx.currentTime + 0.12);
   }
 
   /**
-   * Play a warm harmonic arpeggio for high-vibe milestones/successes.
+   * Play a warm ascending chime for high-vibe milestones/successes (spa resonance).
    */
   public playSuccess() {
     this.init();
     if (this.isMuted || !this.ctx || !this.masterGain) return;
-    this.logSound("Somatic Harmonic - Success Chime");
+    this.logSound("Warm Ascending Chime - Success");
 
     const now = this.ctx.currentTime;
-    const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5 major chords
+    // Ascending warm pentatonic frequencies (A3, C#4, E4, A4, B4)
+    const notes = [220.00, 277.18, 329.63, 440.00, 493.88];
     
     notes.forEach((freq, index) => {
       if (!this.ctx || !this.masterGain) return;
@@ -126,17 +127,50 @@ class SoundEngine {
       const gain = this.ctx.createGain();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, now + index * 0.08);
+      osc.frequency.setValueAtTime(freq, now + index * 0.09);
 
-      gain.gain.setValueAtTime(0, now + index * 0.08);
-      gain.gain.linearRampToValueAtTime(0.12, now + index * 0.08 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.45);
+      gain.gain.setValueAtTime(0, now + index * 0.09);
+      gain.gain.linearRampToValueAtTime(0.09, now + index * 0.09 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.09 + 0.65);
 
       osc.connect(gain);
       gain.connect(this.masterGain);
 
-      osc.start(now + index * 0.08);
-      osc.stop(now + index * 0.08 + 0.5);
+      osc.start(now + index * 0.09);
+      osc.stop(now + index * 0.09 + 0.7);
+    });
+  }
+
+  /**
+   * Play a gentle singing bowl bell for breathing phase cues.
+   */
+  public playBreathingCue() {
+    this.init();
+    if (this.isMuted || !this.ctx || !this.masterGain) return;
+    this.logSound("Gentle Breathing Bell");
+
+    const now = this.ctx.currentTime;
+    const fundamental = 256.0; // Root C singing bowl
+    const partials = [1, 1.98, 2.95];
+
+    partials.forEach((mult, idx) => {
+      if (!this.ctx || !this.masterGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(fundamental * mult, now);
+      
+      const volumeScale = idx === 0 ? 0.18 : 0.08 / mult;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volumeScale, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(now);
+      osc.stop(now + 2.5);
     });
   }
 

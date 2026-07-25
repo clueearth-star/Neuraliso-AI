@@ -5,7 +5,9 @@ export interface Message {
   timestamp: string;
 }
 
-export type ActiveView = "home" | "chat" | "sos" | "hotline" | "profile" | "moodCheck" | "relief" | "reviews" | "neuroSkeletons";
+export type ActiveView = "home" | "chat" | "sos" | "hotline" | "profile" | "moodCheck" | "relief" | "reviews" | "neuroSkeletons" | "breathe";
+
+export type CompanionTone = "warm" | "calm" | "direct";
 
 export interface JournalEntry {
   id: string;

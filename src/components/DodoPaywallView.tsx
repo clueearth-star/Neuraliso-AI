@@ -94,16 +94,20 @@ export const DodoPaywallView: React.FC<DodoPaywallViewProps> = ({
 
   return (
     <div id="neuraliso-dodo-paywall" className="min-h-[80vh] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white/90 backdrop-blur-xl border border-primary-sage/20 p-8 space-y-6 text-center shadow-2xl rounded-3xl relative animate-fade-in">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-deep-sage via-primary-sage to-calm-blue rounded-t-3xl" />
+      <div className="w-full max-w-md wellness-card border border-white/10 p-8 space-y-6 text-center shadow-2xl rounded-apple-lg relative animate-page-in">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cyan-500 via-teal-500 to-[#00d4ff] rounded-t-3xl" />
         
         {/* Verification Loading Overlays */}
         {verifying && (
-          <div className="space-y-4 py-8">
-            <div className="w-12 h-12 border-4 border-primary-sage/30 border-t-primary-sage rounded-full animate-spin mx-auto" />
-            <h4 className="text-lg font-serif font-bold text-dark-text italic">Verifying Connection</h4>
-            <p className="text-xs text-muted-text font-mono tracking-wider max-w-xs mx-auto">
-              Securing handshake with Dodo Payments cloud infrastructure ...
+          <div className="space-y-4 py-6">
+            <div className="wellness-card p-5 space-y-3 border border-white/10 mx-auto max-w-xs">
+              <div className="h-5 w-2/3 mx-auto rounded-apple-sm animate-shimmer" />
+              <div className="h-3 w-full rounded-apple-sm animate-shimmer" />
+              <div className="h-3 w-4/5 mx-auto rounded-apple-sm animate-shimmer" />
+            </div>
+            <h4 className="text-h3 text-white font-medium">Verifying Connection</h4>
+            <p className="text-caption text-secondary-50 max-w-xs mx-auto">
+              Securing handshake with Dodo Payments cloud infrastructure...
             </p>
           </div>
         )}

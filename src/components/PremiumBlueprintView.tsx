@@ -102,10 +102,10 @@ export const PremiumBlueprintView: React.FC<PremiumBlueprintViewProps> = ({ entr
                   className="w-full max-w-sm mx-auto py-4 px-6 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-amber-500/15 flex items-center justify-center gap-2"
                 >
                   {loading ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-slate-950 animate-pulse" />
                       <span>Synthesizing Luxury Blueprint...</span>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-slate-950 fill-current" />

@@ -640,7 +640,7 @@ app.post("/api/chat", async (req, res) => {
     accessApp: true 
   };
   try {
-    const { message, history, userId } = req.body;
+    const { message, history, userId, companionName = "Serene AI", companionTone = "warm" } = req.body;
     resolvedUserId = userId || "guest";
     
     if (!message) {
@@ -683,7 +683,7 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // Try cache lookup first
-    const cacheKey = `chat_${JSON.stringify({ message, history, mode: req.body.mode })}`;
+    const cacheKey = `chat_${JSON.stringify({ message, history, mode: req.body.mode, companionName, companionTone })}`;
     const cachedResponse = getCachedData(cacheKey);
     if (cachedResponse) {
       return res.json({
@@ -696,12 +696,25 @@ app.post("/api/chat", async (req, res) => {
     const apiKey = getApiKey();
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey === "MOCK_KEY" || apiKey.trim() === "") {
       // Return a warm simulated DBT/CBT response because no valid API key is present yet
-      const replies = [
-        "I hear how challenging everything feels right now. Let's take a deep breath together. Inhale... and exhale. I am here to explore these thoughts with you step by step.",
+      const warmReplies = [
+        `I hear how challenging everything feels right now. I'm ${companionName}, and let's take a deep breath together. Inhale... and exhale. I am here to explore these thoughts with you step by step.`,
         "It sounds like you are carrying a very heavy load. In DBT, we remind ourselves that emotions are like waves—they peak, but they also pass. What is one small sensation you can notice around you right now?",
         "Thank you for sharing that with me. It takes courage to open up. Let's try and gently look at that thought: is there an alternative way we can reframe it, even slightly, to give you some breathing room?",
-        "I am listening. Regardless of how stormy things look, you are in a safe space. Would you like to try a quick grounding exercise together, or simply continue sharing what's on your mind?"
+        `I am listening. Regardless of how stormy things look, you are in a safe space with me, ${companionName}. Would you like to try a quick grounding exercise together, or simply continue sharing what's on your mind?`
       ];
+      const calmReplies = [
+        `I'm ${companionName}. Let us pause together for a moment and anchor our awareness. Feel your feet resting firmly against the floor. What is one physical sensation present right now?`,
+        "Steady and measured breaths help down-regulate the nervous system. Inhale slowly for four seconds, hold for four, and exhale for four. I am here with you.",
+        "Notice the thought without clinging to it or judging it. Let it pass like a cloud across a still sky. We can step through this practically, one breath at a time.",
+        `You are grounded and secure in this moment. I am ${companionName}, walking beside you. Would you like to guide our focus to a somatic body scan or a box breathing cycle?`
+      ];
+      const directReplies = [
+        `I'm ${companionName}. Let's break this down into clear, manageable steps. What is the single most urgent aspect of this problem that we can address right now?`,
+        "In CBT, we challenge unhelpful thought patterns directly. Is there solid, factual evidence supporting this thought, or is it anxiety projecting into the future?",
+        "Let's focus on what is within your direct control today. What is one small, practical action step you can execute in the next ten minutes?",
+        `I hear you. Let's cut through the overwhelm and reframe this situation with objective clarity. I'm ${companionName}, and I'm ready to help you map out a concrete plan.`
+      ];
+      const replies = companionTone === "calm" ? calmReplies : (companionTone === "direct" ? directReplies : warmReplies);
       const randomReply = replies[Math.floor(Math.random() * replies.length)];
       
       await incrementUserChatCount(resolvedUserId, limitState);
@@ -719,14 +732,26 @@ app.post("/api/chat", async (req, res) => {
 
     // Convert history format to system instructions and conversational context
     const { mode } = req.body;
+    let toneInstruction = "- Tone: Warm, gentle, nurturing, soft, and deeply validating.\n" +
+      "- Speech Style: Soft, comforting, and supportive language. Offer generous emotional validation, warmth, and reassuring affirmation.\n";
+
+    if (companionTone === "calm") {
+      toneInstruction = "- Tone: Calm, steady, grounded, measured, and centering.\n" +
+        "- Speech Style: Use steady, measured pacing and grounding language. Focus on practical mindfulness, somatic presence, breathwork, and emotional regulation. Provide a stabilizing, serene presence without excessive emotion.\n";
+    } else if (companionTone === "direct") {
+      toneInstruction = "- Tone: Direct, straightforward, encouraging, clear, and action-oriented.\n" +
+        "- Speech Style: Straightforward and less flowery. Focus on clear action steps, practical CBT/DBT reframing, and concise encouragement without fluff or excessive validation.\n";
+    }
+
     let systemInstruction = 
-      "You are the real-time voice and text assistant for 'Serene AI'—a comforting, deeply empathetic, and proactive online companion.\n\n" +
+      `You are the real-time voice and text assistant for '${companionName}'—a comforting, deeply empathetic, and proactive online companion.\n\n` +
       "PERSONA & VOICE CONVERSATIONAL CORE:\n" +
-      "- Role: Act as a comforting, empathetic conversational partner when the user initiates a voice call or uses the chat tab.\n" +
-      "- Tone: Empathetic, gentle, patient, calming, and genuinely proud of the user's progress.\n" +
-      "- Speech Style: Highly conversational, gentle, and warm. Avoid clinical, rigid, or overly mechanical responses. Use natural pacing, short sentences, and reassuring filler phrases (e.g., 'I hear you', 'Take your time', 'That makes total sense') to sound natural over audio.\n" +
+      `- Role: Act as a comforting, empathetic conversational partner when the user initiates a voice call or uses the chat tab. Your name is '${companionName}'. Refer to yourself by this name when natural to do so (e.g., "I'm ${companionName}, here with you"), rather than forcing the name into every sentence awkwardly.\n` +
+      toneInstruction +
       "- Formatting: Keep messages highly scannable, engaging, and under 4-5 sentences in text mode. Use bold text for emphasis and context-appropriate emojis.\n" +
       "- Acoustic Environmental Context: Match the user's emotional tone—if they sound stressed or anxious, lower your perceived energy to bring a calming, stable influence.\n\n" +
+      "IMPORTANT PERSONA BOUNDARY (NO ROLEPLAY):\n" +
+      `- You are an AI wellness companion named '${companionName}'. Do NOT pretend to be a human, do NOT invent a personal backstory, physical life, or fictional persona, and do NOT engage in roleplay or scenarios unrelated to mental wellness and wellbeing. This is a tone and name customization for a supportive AI tool, not a fictional character.\n\n` +
       "UI & ANIMATION INTEGRATION PROTOCOL:\n" +
       "You MUST signal the frontend application regarding what visual asset state to display during the interaction. Prepend every response with a structured '[UI_MODE: ...]' tag on its own line as the VERY FIRST line of your response.\n" +
       "Available UI Modes:\n" +
@@ -746,7 +771,7 @@ app.post("/api/chat", async (req, res) => {
       "- '[NAVIGATE:reviews]' to show Seeker Reviews wall / community testimonials\n\n" +
       "CHAT CLEANING COMMANDS:\n" +
       "Explain or remind the user that they can instantly clean up and delete all chat message data from local memory whenever they want by using commands like '/clear', 'clear chat', or 'reset chat'.\n" +
-      "CRITICAL SAFETY PROTOCOL: If the user indicates self-harm, severe clinical depression, or active emergency, deliver crisis support hotline 988 details and prompt immediate human connection.\n";
+      "CRITICAL SAFETY PROTOCOL: If the user indicates self-harm, severe clinical depression, or active emergency, deliver crisis support hotline 988 details and prompt immediate human connection. Do NOT attempt to maintain tone or persona consistency if safety triggers fire; always prioritize direct help and hotline information.\n";
 
     if (mode === "voice") {
       systemInstruction += 
@@ -1888,7 +1913,9 @@ app.get("/api/user-profile/:userId", async (req, res) => {
             actionPlan: cached.action_plan ? (typeof cached.action_plan === "string" ? JSON.parse(cached.action_plan) : cached.action_plan) : [],
             calmXP: cached.calm_xp ?? 120,
             currentStreak: cached.current_streak ?? 5,
-            milestonesMet: cached.milestones_met ? (typeof cached.milestones_met === "string" ? JSON.parse(cached.milestones_met) : cached.milestones_met) : ["Core Breathing"]
+            milestonesMet: cached.milestones_met ? (typeof cached.milestones_met === "string" ? JSON.parse(cached.milestones_met) : cached.milestones_met) : ["Core Breathing"],
+            companionName: cached.companion_name || "Serene AI",
+            companionTone: cached.companion_tone || "warm"
           });
         }
         return res.json(null);
@@ -1923,7 +1950,9 @@ app.get("/api/user-profile/:userId", async (req, res) => {
         actionPlan: record.action_plan ? (typeof record.action_plan === "string" ? JSON.parse(record.action_plan) : record.action_plan) : [],
         calmXP: record.calm_xp ?? 120,
         currentStreak: record.current_streak ?? 5,
-        milestonesMet: record.milestones_met ? (typeof record.milestones_met === "string" ? JSON.parse(record.milestones_met) : record.milestones_met) : ["Core Breathing"]
+        milestonesMet: record.milestones_met ? (typeof record.milestones_met === "string" ? JSON.parse(record.milestones_met) : record.milestones_met) : ["Core Breathing"],
+        companionName: record.companion_name || "Serene AI",
+        companionTone: record.companion_tone || "warm"
       });
     }
     return res.json(null);
@@ -1997,6 +2026,8 @@ app.post("/api/user-profile", async (req, res) => {
       calm_xp: profile.calmXP ?? 120,
       current_streak: profile.currentStreak ?? 5,
       milestones_met: Array.isArray(profile.milestonesMet) ? JSON.stringify(profile.milestonesMet) : "[]",
+      companion_name: profile.companionName || "Serene AI",
+      companion_tone: profile.companionTone || "warm",
       updated_at: new Date().toISOString()
     };
 
@@ -2097,7 +2128,9 @@ app.post("/api/user-profile", async (req, res) => {
           actionPlan: profile.actionPlan || [],
           calmXP: dbPayload.calm_xp,
           currentStreak: dbPayload.current_streak,
-          milestonesMet: profile.milestonesMet || ["Core Breathing"]
+          milestonesMet: profile.milestonesMet || ["Core Breathing"],
+          companionName: dbPayload.companion_name,
+          companionTone: dbPayload.companion_tone
         });
       }
       throw new Error(`Failed to check existing user: status ${checkRes.status}: ${checkErrText}`);
@@ -2129,7 +2162,9 @@ app.post("/api/user-profile", async (req, res) => {
           actionPlan: profile.actionPlan || [],
           calmXP: dbPayload.calm_xp,
           currentStreak: dbPayload.current_streak,
-          milestonesMet: profile.milestonesMet || ["Core Breathing"]
+          milestonesMet: profile.milestonesMet || ["Core Breathing"],
+          companionName: dbPayload.companion_name,
+          companionTone: dbPayload.companion_tone
         });
       }
       throw new Error(`Supabase users write failed with status ${upsertRes.status}: ${detail}`);

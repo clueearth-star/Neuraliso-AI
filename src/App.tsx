@@ -9,6 +9,7 @@ import { AnalyticsView } from "./components/AnalyticsView";
 import { HotlineView } from "./components/HotlineView";
 import { ProfileView } from "./components/ProfileView";
 import { ReliefStationView } from "./components/ReliefStationView";
+import { BreatheView } from "./components/BreatheView";
 import { SOSIcon } from "./components/Icons";
 
 // Onboarding & Enterprise Additions
@@ -130,6 +131,8 @@ function AppContent({
     currentStreak?: number;
     milestonesMet?: string[];
     preferredCheckinTime?: string;
+    companionName?: string;
+    companionTone?: "warm" | "calm" | "direct";
   } | null>(null);
 
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
@@ -277,7 +280,9 @@ function AppContent({
               calmXP: data.calmXP ?? 120,
               currentStreak: data.currentStreak ?? 5,
               milestonesMet: data.milestonesMet ?? ["Core Breathing"],
-              preferredCheckinTime: data.preferredCheckinTime
+              preferredCheckinTime: data.preferredCheckinTime,
+              companionName: data.companionName || "Serene AI",
+              companionTone: data.companionTone || "warm"
             });
             if (hasCompletedOnboarding) {
               setIsOnboarded(true);
@@ -298,7 +303,9 @@ function AppContent({
               completedOnboarding: false,
               calmXP: 120,
               currentStreak: 5,
-              milestonesMet: ["Core Breathing"]
+              milestonesMet: ["Core Breathing"],
+              companionName: "Serene AI",
+              companionTone: "warm" as const
             };
 
             // Save to Supabase
@@ -338,7 +345,9 @@ function AppContent({
             notificationsEnabled: true,
             calmXP: parsedOnboarding?.calmXP ?? 120,
             currentStreak: parsedOnboarding?.currentStreak ?? 5,
-            milestonesMet: parsedOnboarding?.milestonesMet ?? ["Core Breathing"]
+            milestonesMet: parsedOnboarding?.milestonesMet ?? ["Core Breathing"],
+            companionName: parsedOnboarding?.companionName || "Serene AI",
+            companionTone: parsedOnboarding?.companionTone || "warm"
           });
           
           const previouslyOnboarded = localStorage.getItem("neuraliso_onboarded") === "true";
@@ -369,7 +378,9 @@ function AppContent({
             notificationsEnabled: parsed.notificationsEnabled ?? true,
             calmXP: parsed.calmXP ?? 120,
             currentStreak: parsed.currentStreak ?? 5,
-            milestonesMet: parsed.milestonesMet ?? ["Core Breathing"]
+            milestonesMet: parsed.milestonesMet ?? ["Core Breathing"],
+            companionName: parsed.companionName || "Serene AI",
+            companionTone: parsed.companionTone || "warm"
           });
         } catch (e) {
           setUserProfile(null);
@@ -594,7 +605,9 @@ function AppContent({
       calmXP: userProfile?.calmXP ?? 120,
       currentStreak: userProfile?.currentStreak ?? 5,
       milestonesMet: userProfile?.milestonesMet ?? ["Core Breathing"],
-      preferredCheckinTime: data.preferredCheckinTime || "08:00 PM"
+      preferredCheckinTime: data.preferredCheckinTime || "08:00 PM",
+      companionName: data.companionName || "Serene AI",
+      companionTone: data.companionTone || "warm"
     };
 
     setOnboardingProfile(profileData);
@@ -633,7 +646,9 @@ function AppContent({
         calmXP: profileData.calmXP,
         currentStreak: profileData.currentStreak,
         milestonesMet: profileData.milestonesMet,
-        preferredCheckinTime: profileData.preferredCheckinTime
+        preferredCheckinTime: profileData.preferredCheckinTime,
+        companionName: profileData.companionName,
+        companionTone: profileData.companionTone
       });
     } else {
       setIsOfflineSandbox(true);
@@ -655,7 +670,9 @@ function AppContent({
         calmXP: 120,
         currentStreak: 5,
         milestonesMet: ["Core Breathing"],
-        preferredCheckinTime: data.preferredCheckinTime || "08:00 PM"
+        preferredCheckinTime: data.preferredCheckinTime || "08:00 PM",
+        companionName: data.companionName || "Serene AI",
+        companionTone: data.companionTone || "warm"
       });
     }
 
@@ -724,6 +741,12 @@ function AppContent({
       {/* 🧭 NAVIGATION BAR AT TOP */}
       <div className="pt-8">
         <Navbar 
+          themeMode={userProfile?.themeMode || "neutral"}
+          onToggleTheme={() => {
+            const currentTheme = userProfile?.themeMode || "neutral";
+            const nextTheme = currentTheme === "neutral" ? "light" : "neutral";
+            handleUpdateProfile({ themeMode: nextTheme });
+          }}
           onGetStarted={() => {
             if (!user && !isOfflineSandbox) {
               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -764,13 +787,30 @@ function AppContent({
       {/* CORE FRAME CONTAINER */}
       <main className="relative z-10 px-4 pt-6 max-w-2xl mx-auto">
         
-        {/* LOADING AUTH SPINNER */}
+        {/* PREMIUM SKELETON SHIMMER LOADING SCREEN */}
         {loadingAuth || (user && (loadingProfile || !userProfile)) ? (
-          <div className="flex flex-col items-center justify-center min-h-[70vh] space-y-4">
-            <div className="w-10 h-10 border-4 border-primary-sage/30 border-t-primary-sage rounded-full animate-spin" />
-            <p className="text-xs font-mono text-muted-text uppercase tracking-widest animate-pulse">
-              Securing connection ...
-            </p>
+          <div className="flex flex-col justify-center min-h-[70vh] space-y-6 max-w-lg mx-auto py-12 animate-page-in">
+            <div className="space-y-3 text-center">
+              <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[#00d4ff] text-[11px] font-mono tracking-wider uppercase">
+                Serene Awakening
+              </span>
+              <h3 className="text-h3 text-white font-medium tracking-tight">
+                Your journey starts here. Check in to see your patterns grow.
+              </h3>
+            </div>
+            
+            <div className="wellness-card p-6 space-y-4 border border-white/10 shadow-2xl">
+              <div className="h-6 w-1/3 rounded-apple-sm animate-shimmer" />
+              <div className="space-y-2 pt-2">
+                <div className="h-4 w-full rounded-apple-sm animate-shimmer" />
+                <div className="h-4 w-5/6 rounded-apple-sm animate-shimmer" />
+                <div className="h-4 w-2/3 rounded-apple-sm animate-shimmer" />
+              </div>
+              <div className="pt-4 flex gap-3">
+                <div className="h-10 w-28 rounded-apple-pill animate-shimmer" />
+                <div className="h-10 w-28 rounded-apple-pill animate-shimmer opacity-60" />
+              </div>
+            </div>
           </div>
         ) : crisisActive ? (
           /* APP SAFETY CRISIS TAKEOVER OVERLAY */
@@ -908,6 +948,8 @@ function AppContent({
                 onNavigate={(v) => setActiveView(v)}
                 premiumActive={userProfile?.premiumActive ?? false}
                 userId={user?.id}
+                companionName={userProfile?.companionName || "Serene AI"}
+                companionTone={userProfile?.companionTone || "warm"}
               />
             )}
 
@@ -997,6 +1039,10 @@ function AppContent({
 
             {activeView === "neuroSkeletons" && (
               <NeuroplasmWorkshopView onBack={() => setActiveView("home")} />
+            )}
+
+            {activeView === "breathe" && (
+              <BreatheView onBack={() => setActiveView("home")} />
             )}
 
           </div>

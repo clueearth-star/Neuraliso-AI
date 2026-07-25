@@ -1,7 +1,7 @@
 import React from "react";
 import { ActiveView } from "../types";
 import { HomeIcon, ChatIcon, HotlineIcon, ProfileIcon } from "./Icons";
-import { Tv } from "lucide-react";
+import { Tv, Wind } from "lucide-react";
 import { sounds } from "../lib/sounds";
 
 interface NavigationProps {
@@ -12,9 +12,9 @@ interface NavigationProps {
 export const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
   const navItems = [
     { id: "home", label: "Home", icon: <HomeIcon size={20} /> },
+    { id: "breathe", label: "Breathe", icon: <Wind size={18} /> },
     { id: "chat", label: "AI Chat", icon: <ChatIcon size={20} /> },
     { id: "relief", label: "Relief", icon: <Tv size={18} /> },
-    { id: "hotline", label: "Hotlines", icon: <HotlineIcon size={20} /> },
     { id: "profile", label: "Profile", icon: <ProfileIcon size={20} /> },
   ];
 

@@ -4,7 +4,8 @@ import { LeafLogoIcon, SadMoodIcon, AnxiousMoodIcon, OverwhelmedMoodIcon, Lonely
 import { OracleDeck } from "./OracleDeck";
 import { AuraLounge } from "./AuraLounge";
 import { HowItWorksSection } from "./HowItWorksSection";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Target, CheckCircle2, Circle, Sparkles } from "lucide-react";
+import { sounds } from "../lib/sounds";
 
 interface HomeViewProps {
   onNavigate: (view: ActiveView) => void;
@@ -36,6 +37,37 @@ export const HomeView: React.FC<HomeViewProps> = ({
     { title: "Vagal Adept", desc: "Paced stress relief completed", icon: "🔋", earned: currentStress <= 4 },
     { title: "7-Day Warrior", desc: "Logged 7 recovery sessions", icon: "🛡️", earned: entries.length >= 7 }
   ];
+
+  // Daily Wellness Goals State
+  interface GoalItem {
+    id: string;
+    title: string;
+    category: string;
+    completed: boolean;
+  }
+
+  const defaultGoals: GoalItem[] = [
+    { id: "g1", title: "Morning Mood Check-in", category: "Mindfulness", completed: true },
+    { id: "g2", title: "Box Breathing Grounding (4 min)", category: "Regulation", completed: false },
+    { id: "g3", title: "Sprout 1 Gratitude Reflection", category: "Journaling", completed: true },
+    { id: "g4", title: "Hydration & Somatic Jaw Unclench", category: "Body Care", completed: false },
+    { id: "g5", title: "Evening CBT Wind-down Log", category: "Reflection", completed: false },
+  ];
+
+  const [goals, setGoals] = useState<GoalItem[]>(() => {
+    const saved = localStorage.getItem("serene_daily_goals");
+    return saved ? JSON.parse(saved) : defaultGoals;
+  });
+
+  const toggleGoal = (id: string) => {
+    sounds.playClick();
+    const updated = goals.map((g) => (g.id === id ? { ...g, completed: !g.completed } : g));
+    setGoals(updated);
+    localStorage.setItem("serene_daily_goals", JSON.stringify(updated));
+  };
+
+  const completedGoalsCount = goals.filter((g) => g.completed).length;
+  const goalsProgressPercent = Math.round((completedGoalsCount / goals.length) * 100);
 
   // Gratitude Garden State (Feature #1)
   const [gratitudes, setGratitudes] = useState<string[]>(() => {
@@ -279,6 +311,76 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </div>
 
+      {/* 🎯 DAILY WELLNESS GOALS SECTION */}
+      <div id="daily-wellness-goals-card" className="wellness-card p-6 bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-teal-950/80 text-teal-300 rounded-xl border border-teal-800/50">
+              <Target size={18} />
+            </div>
+            <div>
+              <h3 className="font-sans font-bold text-white text-sm tracking-wide">Daily Wellness Goals</h3>
+              <p className="text-[10px] text-slate-400 font-mono">Consistencies build neural resilience</p>
+            </div>
+          </div>
+
+          <div className="text-right font-mono">
+            <span className="text-sm font-bold text-teal-300">{completedGoalsCount} / {goals.length}</span>
+            <span className="text-[10px] text-slate-400 block font-sans">Completed</span>
+          </div>
+        </div>
+
+        {/* Progress Bar with Existing Teal Gradient */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center text-xs font-mono">
+            <span className="text-slate-400 text-[11px]">Daily Habit Progress</span>
+            <span className="text-teal-300 font-bold">{goalsProgressPercent}%</span>
+          </div>
+          <div className="w-full bg-slate-950 rounded-full h-3 border border-slate-800 overflow-hidden relative">
+            <div
+              className="bg-gradient-to-r from-teal-400 to-cyan-400 h-full transition-all duration-500 rounded-full shadow-[0_0_12px_rgba(45,212,191,0.4)]"
+              style={{ width: `${goalsProgressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Interactive Goals List */}
+        <div className="space-y-2 pt-1">
+          {goals.map((goal) => (
+            <button
+              key={goal.id}
+              onClick={() => toggleGoal(goal.id)}
+              className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer group ${
+                goal.completed
+                  ? "bg-teal-950/30 border-teal-500/30 text-slate-200"
+                  : "bg-slate-950/40 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-1 rounded-lg transition-colors ${goal.completed ? "text-teal-300 bg-teal-500/20" : "text-slate-600 group-hover:text-slate-400"}`}>
+                  {goal.completed ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+                </div>
+                <span className={`text-xs font-medium ${goal.completed ? "line-through text-slate-400" : "text-slate-100"}`}>
+                  {goal.title}
+                </span>
+              </div>
+              <span className={`text-[9.5px] font-mono px-2 py-0.5 rounded-md border ${
+                goal.completed ? "bg-teal-950 border-teal-800/60 text-teal-300" : "bg-slate-900 border-slate-800 text-slate-500"
+              }`}>
+                {goal.category}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {goalsProgressPercent === 100 && (
+          <div className="p-3 bg-gradient-to-r from-teal-950/80 to-cyan-950/80 border border-teal-500/50 rounded-xl text-center text-xs font-medium text-teal-200 flex items-center justify-center gap-2 animate-fade-in">
+            <Sparkles size={15} className="text-teal-300 animate-bounce" />
+            <span>All daily wellness goals achieved! Rest deeply knowing you prioritized yourself today.</span>
+          </div>
+        )}
+      </div>
+
       {/* DYNAMIC COMPASSION ACTION PLAN Prescriptions (CBT DYNAMIC PLAN) */}
       <div id="dynamic-cognitive-roadmap" className="wellness-card p-6 border bg-slate-900 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
@@ -334,6 +436,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <h3 className="text-sm font-bold text-white uppercase tracking-wide font-sans">Quick Healing Modules</h3>
         
         <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => onNavigate("breathe")}
+            className="col-span-2 p-4 rounded-2xl bg-gradient-to-r from-teal-950/80 via-cyan-950/60 to-slate-900 border border-teal-500/40 hover:border-teal-400 flex items-center justify-between text-left cursor-pointer transition-all active:scale-98 shadow-md group"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl p-2 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 group-hover:scale-110 transition-transform">🌬️</span>
+              <div>
+                <strong className="text-white text-sm font-bold block">Box Breathing Sanctum</strong>
+                <span className="text-[11px] text-teal-300/80 font-mono">4-8s animated circle grounding</span>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-teal-300 bg-teal-950 px-3 py-1.5 rounded-xl border border-teal-800/80">
+              Start
+            </span>
+          </button>
+
           <button
             onClick={() => onNavigate("moodCheck")}
             className="p-3.5 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/60 flex flex-col justify-between items-start text-left cursor-pointer transition-all active:scale-95"

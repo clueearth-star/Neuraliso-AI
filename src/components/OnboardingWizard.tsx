@@ -49,6 +49,8 @@ interface OnboardingWizardProps {
     actionPlan: string[];
     preferredCheckinTime: string;
     premiumActive?: boolean;
+    companionName?: string;
+    companionTone?: "warm" | "calm" | "direct";
   }) => void;
   onEnterEnterpriseDemo: () => void;
   currentUser?: any;
@@ -365,6 +367,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [coping, setCoping] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
   const [preferredCheckinTime, setPreferredCheckinTime] = useState("08:00 PM");
+  const [companionName, setCompanionName] = useState("Serene AI");
+  const [companionTone, setCompanionTone] = useState<"warm" | "calm" | "direct">("warm");
 
   // Core thematic 3D positions
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -488,7 +492,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       initialScore: calculatedScore,
       actionPlan,
       preferredCheckinTime,
-      premiumActive: premiumActiveOverride !== undefined ? premiumActiveOverride : false
+      premiumActive: premiumActiveOverride !== undefined ? premiumActiveOverride : false,
+      companionName: companionName.trim() || "Serene AI",
+      companionTone
     });
   };
 
@@ -1262,6 +1268,43 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     <option value="08:00 PM">Evening (08:00 PM)</option>
                     <option value="10:00 PM">Night (10:00 PM)</option>
                   </select>
+                </div>
+
+                {/* Companion Customization */}
+                <div className="p-3.5 bg-indigo-50/50 border border-indigo-200/60 rounded-2xl space-y-3">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-950 block">AI Companion Customization</span>
+                    <span className="text-[10px] text-indigo-700/80 font-mono">Personalize your guide's name and speech style</span>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 uppercase block mb-1">Companion Name</label>
+                    <input
+                      type="text"
+                      value={companionName}
+                      onChange={(e) => setCompanionName(e.target.value)}
+                      placeholder="e.g. Serene AI, Aria, Atlas"
+                      className="w-full p-2 text-xs border border-slate-200 rounded-xl bg-white text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 uppercase block mb-1">Conversation Tone</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(["warm", "calm", "direct"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setCompanionTone(t)}
+                          className={`py-1.5 px-2 text-[11px] rounded-lg font-bold capitalize border transition-all ${
+                            companionTone === t
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 

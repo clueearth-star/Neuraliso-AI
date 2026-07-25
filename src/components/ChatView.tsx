@@ -66,9 +66,18 @@ interface ChatViewProps {
   onNavigate?: (view: any) => void;
   premiumActive: boolean;
   userId?: string;
+  companionName?: string;
+  companionTone?: "warm" | "calm" | "direct";
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate, premiumActive, userId }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ 
+  onTriggerSafety, 
+  onNavigate, 
+  premiumActive, 
+  userId,
+  companionName = "Serene AI",
+  companionTone = "warm"
+}) => {
   const [messages, setMessages] = useState<Message[]>(() => {
     // Attempt load from localStorage
     const saved = localStorage.getItem("neuraliso_chat_history");
@@ -83,7 +92,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
       {
         id: "sys-1",
         sender: "bot",
-        text: "Warm greetings, dear friend. I am Neuraliso AI, your companion in tracking emotional waves, grounding anxiety, and reframing tough thoughts. Whenever you need support, I am here. Tell me, what lies on your heart today?",
+        text: `Warm greetings, dear friend. I am ${companionName}, your companion in tracking emotional waves, grounding anxiety, and reframing tough thoughts. Whenever you need support, I am here. Tell me, what lies on your heart today?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ];
@@ -341,7 +350,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         {
           id: "sys-fresh-voice",
           sender: "bot",
-          text: "I have successfully cleared all our chat records and reset your conversation space. 🙏 Tell me, what's on your mind?",
+          text: `I have successfully cleared all our chat records and reset your conversation space. I'm ${companionName}, here whenever you're ready. 🙏 Tell me, what's on your mind?`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -386,7 +395,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
           message: text,
           history: historyMapped,
           mode: "voice",
-          userId: userId || "guest"
+          userId: userId || "guest",
+          companionName,
+          companionTone
         })
       });
 
@@ -547,7 +558,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         const resetMsg: Message = {
           id: "sys-fresh-command",
           sender: "bot",
-          text: "I have successfully cleared all our chat records and reset your conversation space as you commanded. We are now starting afresh. 🙏 Tell me, what is on your mind?",
+          text: `I have successfully cleared all our chat records and reset your conversation space as you commanded. I'm ${companionName}, and we are now starting afresh. 🙏 Tell me, what is on your mind?`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages([resetMsg]);
@@ -572,7 +583,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         body: JSON.stringify({
           message: textToSend,
           history: historyMapped,
-          userId: userId || "guest"
+          userId: userId || "guest",
+          companionName,
+          companionTone
         })
       });
 
@@ -672,7 +685,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         {
           id: "sys-fresh",
           sender: "bot",
-          text: "I've carefully reset our space. Whenever you're ready, take a quiet inhale and let me know how I can comfort you.",
+          text: `I've carefully reset our space. I'm ${companionName}, and whenever you're ready, take a quiet inhale and let me know how I can comfort you.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ];
@@ -689,7 +702,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ onTriggerSafety, onNavigate,
         <div className="flex items-center gap-2.5">
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-sm" />
           <div>
-            <h3 className="font-sans font-bold text-dark-text text-sm">Neuraliso AI Companion</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-sans font-bold text-dark-text text-sm">{companionName} Companion</h3>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-[#5C8A6E]/10 text-[#5C8A6E] font-bold">
+                {companionTone} tone
+              </span>
+            </div>
             <p className="text-[10px] text-muted-text">Powered by Gemini CBT Guard</p>
             {dailyLimit !== null && dailyCount !== null && (
               <div className="flex flex-col gap-0.5 mt-0.5">

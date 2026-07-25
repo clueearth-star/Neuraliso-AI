@@ -12,6 +12,7 @@ import {
 import { createAndShareReviewFile } from "../lib/drive";
 import { Star, MessageSquare, PenTool, Check, Loader2, ChevronLeft, User, Calendar, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { sounds } from "../lib/sounds";
 
 interface ReviewsViewProps {
   onBackToDashboard: () => void;
@@ -302,6 +303,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
         setReviewerName("");
       }
       setRating(5);
+      sounds.playSuccess();
       setSuccessMsg("Peace with you! Your review has been published live on the reflection wall instantly!");
 
       // Refresh reviews list so user sees their review immediately added and fetched natively from Supabase
@@ -768,26 +770,32 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({
         </h3>
 
         {loading ? (
-          <div className="py-12 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="animate-spin text-primary-sage" size={24} />
-            <span className="text-xs text-muted-text font-mono uppercase tracking-widest">
-              Connecting reflection portal...
-            </span>
+          <div className="space-y-4 py-4 animate-page-in">
+            <div className="wellness-card p-5 space-y-3 border border-white/10">
+              <div className="h-4 w-1/3 rounded-apple-sm animate-shimmer" />
+              <div className="h-3 w-5/6 rounded-apple-sm animate-shimmer" />
+              <div className="h-3 w-2/3 rounded-apple-sm animate-shimmer" />
+            </div>
+            <div className="wellness-card p-5 space-y-3 border border-white/10 opacity-70">
+              <div className="h-4 w-1/4 rounded-apple-sm animate-shimmer" />
+              <div className="h-3 w-4/5 rounded-apple-sm animate-shimmer" />
+            </div>
           </div>
         ) : reviews.length === 0 ? (
-          <div className="py-12 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/30">
-            <span className="text-3xl block filter grayscale mb-2">🌸</span>
-            <p className="text-xs text-muted-text">
-              No public reflections registered yet. Be the first to share your journey!
+          <div className="py-12 text-center wellness-card p-8 border border-white/10">
+            <span className="text-3xl block mb-3">🌸</span>
+            <h4 className="text-h3 text-white font-medium mb-1">Your journey starts here.</h4>
+            <p className="text-body text-secondary-50 max-w-sm mx-auto">
+              Check in to see your patterns grow. Be the first to share your reflection.
             </p>
           </div>
         ) : (
-          <div className="space-y-3.5">
+          <div className="space-y-3.5 stagger-children">
             {reviews.map((rev) => (
               <div
                 key={rev.id}
                 id={`user-review-card-${rev.id}`}
-                className="wellness-card p-5 bg-white border border-slate-100 shadow-xs text-left space-y-3 transition-all hover:bg-slate-50/40 relative duration-300 animate-slide-up"
+                className="wellness-card p-5 border border-white/10 text-left space-y-3 relative duration-300"
               >
                 {/* Header info */}
                 <div className="flex justify-between items-start gap-4">

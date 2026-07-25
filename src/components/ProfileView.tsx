@@ -61,6 +61,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [editGoals, setEditGoals] = useState<string[]>([]);
   const [editChallenges, setEditChallenges] = useState<string[]>([]);
   const [editCoping, setEditCoping] = useState<string[]>([]);
+  const [editCompanionName, setEditCompanionName] = useState("Serene AI");
+  const [editCompanionTone, setEditCompanionTone] = useState<"warm" | "calm" | "direct">("warm");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const displayName = user?.displayName || userProfile?.displayName || "Neuraliso Seeker";
@@ -74,8 +76,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setEditGoals(userProfile.wellnessGoals || []);
       setEditChallenges(userProfile.challenges || []);
       setEditCoping(userProfile.coping || []);
+      setEditCompanionName(userProfile.companionName || "Serene AI");
+      setEditCompanionTone(userProfile.companionTone || "warm");
     } else {
       setEditDisplayName(displayName);
+      setEditCompanionName("Serene AI");
+      setEditCompanionTone("warm");
     }
   }, [userProfile, displayName]);
 
@@ -528,6 +534,43 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
               </div>
 
+              {/* Companion Customization */}
+              <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl space-y-3.5">
+                <div>
+                  <span className="text-[11px] font-bold text-indigo-950 block">AI Companion Customization</span>
+                  <span className="text-[9px] text-indigo-700 font-mono">Personalize your guide's identity and speech style</span>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">Companion Name</label>
+                  <input
+                    type="text"
+                    value={editCompanionName}
+                    onChange={(e) => setEditCompanionName(e.target.value)}
+                    placeholder="e.g. Serene AI, Aria, Atlas"
+                    className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-dark-text focus:outline-none focus:border-indigo-400 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">Conversation Tone</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(["warm", "calm", "direct"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setEditCompanionTone(t)}
+                        className={`py-1.5 px-2 text-[10px] rounded-lg font-bold capitalize border transition-all ${
+                          editCompanionTone === t
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "bg-white text-slate-700 border-gray-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* Action buttons */}
               <div className="pt-2 flex gap-2">
                 <button
@@ -541,7 +584,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         wellnessGoals: editGoals,
                         challenges: editChallenges,
                         coping: editCoping,
-                        completedOnboarding: true
+                        completedOnboarding: true,
+                        companionName: editCompanionName.trim() || "Serene AI",
+                        companionTone: editCompanionTone
                       });
                       setSaveSuccess(true);
                       setTimeout(() => setSaveSuccess(false), 2500);

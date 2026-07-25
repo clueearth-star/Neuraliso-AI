@@ -3,11 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neuraliso AI</title>
+    <meta name="theme-color" content="#0a1628" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Neuraliso AI" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Neuraliso AI - Serene Companion</title>
   </head>
-  <body>
+  <body class="bg-[#0a1628] text-[#f8fafc] antialiased selection:bg-[#00d4ff]/30">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.log('PWA Service Worker registration failed:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
 

@@ -128,7 +128,7 @@ export const LandingPage: React.FC = () => {
           {/* Trust Badge */}
           <div className="pt-6 flex items-center justify-center gap-2 text-xs sm:text-sm text-white/60 bg-white/5 border border-white/10 py-2.5 px-5 rounded-full w-fit mx-auto">
             <ShieldCheck className="w-4 h-4 text-[#00b8a9] shrink-0" />
-            <span>Your data stays on your device. No signup required.</span>
+            <span>Powered by secure Supabase database &amp; optional OAuth cloud sync.</span>
           </div>
         </div>
       </section>

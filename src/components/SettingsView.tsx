@@ -18,20 +18,32 @@ import {
   CloudCheck,
   Loader2,
   LogIn,
-  UserPlus
+  UserPlus,
+  CreditCard,
+  ExternalLink,
+  Calendar,
+  AlertCircle,
+  CheckCircle2
 } from "lucide-react";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { AppSettings } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 export const SettingsView: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile, updateProfileName, signOut, syncStatus, syncMessage, isAnonymous } = useAuth();
+  const { isPro, isTrial, status, tier, expiresAt, billingPeriod, cancelSubscription, upgradeToPro, openUpgradeModal } = useSubscription();
   
   const [settings, setSettings] = useState<AppSettings>(storage.getSettings());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
+
+  const [showCancelSurvey, setShowCancelSurvey] = useState(false);
+  const [cancelFeedback, setCancelFeedback] = useState("");
+  const [cancellingSub, setCancellingSub] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
 
   const [nameInput, setNameInput] = useState("");
   const [updatingName, setUpdatingName] = useState(false);
@@ -228,6 +240,178 @@ export const SettingsView: React.FC = () => {
                     <span>Sign Up</span>
                   </Link>
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 0.5 Subscription & Billing Section */}
+        <div className="wellness-card p-6 sm:p-8 space-y-6 border border-[#FFD700]/20 bg-gradient-to-br from-[#FFD700]/5 via-transparent to-transparent">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2 font-serif">
+              <CreditCard className="w-5 h-5 text-[#FFD700]" />
+              <span>Subscription &amp; Billing</span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                isPro ? "bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30" : "bg-white/10 text-white/70"
+              }`}>
+                {isPro && <Sparkles className="w-3.5 h-3.5" />}
+                <span>{isPro ? (isTrial ? "Plus (Free Trial)" : status === "cancelled" ? "Plus (Cancelled)" : "Plus Member") : "Free Plan"}</span>
+              </span>
+            </div>
+          </div>
+
+          {isPro ? (
+            <div className="space-y-6">
+              <div className="p-5 rounded-2xl bg-black/30 border border-white/10 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-white">Neuraliso Plus {billingPeriod ? `(${billingPeriod})` : ""}</h3>
+                    </div>
+                    {status === "cancelled" ? (
+                      <p className="text-xs text-amber-300 font-medium flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>
+                          Your Plus access continues until{" "}
+                          <strong>{expiresAt ? new Date(expiresAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : "the end of your billing cycle"}</strong>. We&apos;d love to have you back anytime.
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-white/70 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-[#00d4ff]" />
+                        <span>
+                          {isTrial ? "Free trial active. Renews automatically unless cancelled." : `Next billing cycle renews automatically.`}
+                          {expiresAt && ` Valid until ${new Date(expiresAt).toLocaleDateString()}`}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <a
+                      href="https://app.dodo.payments.com/portal"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Manage in Dodo Portal</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    {status !== "cancelled" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playClick();
+                          setShowCancelSurvey(true);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs transition-all cursor-pointer"
+                      >
+                        Cancel Plan
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          sounds.playClick();
+                          await upgradeToPro(billingPeriod || "monthly", true);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#0B1121] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Resume Subscription</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional Exit Survey (No guilt, no dark patterns) */}
+                {showCancelSurvey && status !== "cancelled" && (
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/15 space-y-4 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-white">We&apos;re sorry to see you go!</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelSurvey(false)}
+                        className="text-white/50 hover:text-white text-xs cursor-pointer"
+                      >
+                        Keep Plan
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs text-white/80 block">
+                        Optional feedback: What could we do better?
+                      </label>
+                      <input
+                        type="text"
+                        value={cancelFeedback}
+                        onChange={(e) => setCancelFeedback(e.target.value)}
+                        placeholder="e.g. Too expensive, don't use it enough, missing features..."
+                        className="w-full px-3.5 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 text-xs focus:outline-none focus:border-[#00d4ff]"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelSurvey(false)}
+                        className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white font-semibold text-xs transition-all cursor-pointer"
+                      >
+                        Never mind, keep Plus
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cancellingSub}
+                        onClick={async () => {
+                          sounds.playClick();
+                          setCancellingSub(true);
+                          await cancelSubscription();
+                          setCancellingSub(false);
+                          setShowCancelSurvey(false);
+                          setCancelSuccess(true);
+                        }}
+                        className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all shadow-md shadow-rose-600/30 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {cancellingSub ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        <span>Confirm Cancellation</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {cancelSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                    <span>Your Plus plan has been cancelled without penalty. Your Plus access continues until {expiresAt ? new Date(expiresAt).toLocaleDateString() : "the end of your current cycle"}. We&apos;d love to have you back anytime.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 rounded-2xl bg-black/30 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <h3 className="text-base font-bold text-white flex items-center gap-2 justify-center sm:justify-start">
+                  <span>Upgrade to Neuraliso Plus</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30">
+                    7-Day Free Trial
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-300 max-w-md">
+                  Unlock unlimited CBT thought reframes, all 6 restorative sleep soundscapes, 24/7 AI companion chat, 30-day trends, and CSV data export.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => openUpgradeModal("Manage your subscription plan")}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#FFD700] hover:opacity-95 text-[#0B1121] font-bold text-xs sm:text-sm shadow-md shadow-[#FFD700]/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>View Pricing &amp; Plans</span>
+                </button>
               </div>
             </div>
           )}

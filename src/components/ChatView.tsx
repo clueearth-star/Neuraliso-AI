@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAI } from "../hooks/useAI";
 import { sounds } from "../lib/sounds";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 interface ChatViewProps {
   onClose?: () => void;
@@ -25,6 +26,8 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({ onClose, initialPrompt }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isPro, chatToday, checkFeatureAccess, openUpgradeModal, refreshUsageCounts } = useSubscription();
+  const canSendChat = checkFeatureAccess("chat");
   const { messages, isLoading, sendMessage, clearHistory } = useAI();
   const [input, setInput] = useState("");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -49,15 +52,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ onClose, initialPrompt }) =>
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!input.trim() || isLoading) return;
+    if (!canSendChat && !isPro) {
+      openUpgradeModal("You've reached your daily limit of 5 AI messages. Upgrade to Plus for unlimited 24/7 AI mental health companionship.");
+      return;
+    }
     sounds.playClick();
     const text = input;
     setInput("");
     sendMessage(text);
+    setTimeout(() => refreshUsageCounts(), 500);
   };
 
   const handleQuickPrompt = (promptText: string) => {
+    if (!canSendChat && !isPro) {
+      openUpgradeModal("You've reached your daily limit of 5 AI messages. Upgrade to Plus for unlimited 24/7 AI mental health companionship.");
+      return;
+    }
     sounds.playClick();
     sendMessage(promptText);
+    setTimeout(() => refreshUsageCounts(), 500);
   };
 
   const handleConfirmClear = () => {
@@ -257,25 +270,54 @@ export const ChatView: React.FC<ChatViewProps> = ({ onClose, initialPrompt }) =>
           </div>
         )}
 
-        {/* Bottom Input Area */}
-        <form onSubmit={handleSend} className="p-4 sm:p-5 border-t border-white/10 bg-black/30 flex items-center gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message or ask for a CBT reframe, sleep story..."
-            disabled={isLoading}
-            className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#00d4ff] focus:bg-white/10 transition-all disabled:opacity-50"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            aria-label="Send message"
-            className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00d4ff] to-[#0088ff] hover:from-[#00c0eb] hover:to-[#0077e6] text-[#0B1121] flex items-center justify-center shrink-0 shadow-lg shadow-[#00d4ff]/25 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all cursor-pointer"
-          >
-            <Send className="w-5 h-5 fill-current" />
-          </button>
-        </form>
+        {/* Bottom Input Area & Usage Counter */}
+        <div className="border-t border-white/10 bg-black/30">
+          {!canSendChat && !isPro ? (
+            <div className="p-4 bg-gradient-to-r from-[#FFD700]/15 via-[#FFA500]/10 to-[#FFD700]/15 border-b border-[#FFD700]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#FFD700]/20 flex items-center justify-center text-[#FFD700] shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold">Daily AI message limit reached (5/5)</h4>
+                  <p className="text-xs text-slate-300">Upgrade for unlimited 24/7 mental health companion chat.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => openUpgradeModal("Unlimited 24/7 AI companion support")}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#ffe244] text-[#0B1121] font-bold text-xs shadow-md transition-all cursor-pointer shrink-0"
+              >
+                Unlock Unlimited AI
+              </button>
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSend} className="p-4 sm:p-5 flex items-center gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={!canSendChat && !isPro ? "Daily limit reached. Upgrade to Plus..." : "Type your message or ask for a CBT reframe, sleep story..."}
+              disabled={isLoading || (!canSendChat && !isPro)}
+              className="flex-1 bg-white/5 border border-white/15 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#00d4ff] focus:bg-white/10 transition-all disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading || (!canSendChat && !isPro)}
+              aria-label="Send message"
+              className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00d4ff] to-[#0088ff] hover:from-[#00c0eb] hover:to-[#0077e6] text-[#0B1121] flex items-center justify-center shrink-0 shadow-lg shadow-[#00d4ff]/25 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            >
+              <Send className="w-5 h-5 fill-current" />
+            </button>
+          </form>
+
+          {!isPro && (
+            <div className="px-4 pb-3 text-center text-[11px] text-slate-400">
+              <span>AI messages today: <strong className="text-white">{chatToday}/5</strong> (Free Tier)</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

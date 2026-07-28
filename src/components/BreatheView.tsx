@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Wind, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Bot, MessageCircle } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 interface BreathMode {
-  id: "box" | "478" | "calm";
+  id: "box" | "478" | "calm" | "power" | "sleep";
   name: string;
   description: string;
+  isPro?: boolean;
   phases: { label: "Breathe in..." | "Hold..." | "Breathe out..."; duration: number }[];
 }
 
@@ -15,7 +17,8 @@ const BREATH_MODES: BreathMode[] = [
   {
     id: "box",
     name: "Box Breathing (4-4-4-4)",
-    description: "Used by athletes and first responders to quickly reset stress and steady focus.",
+    description: "Used by athletes and first responders to quickly reset stress and steady focus. Always free.",
+    isPro: false,
     phases: [
       { label: "Breathe in...", duration: 4 },
       { label: "Hold...", duration: 4 },
@@ -27,6 +30,7 @@ const BREATH_MODES: BreathMode[] = [
     id: "478",
     name: "4-7-8 Sleep Rhythm",
     description: "A natural tranquilizer for the nervous system designed to help you fall asleep.",
+    isPro: true,
     phases: [
       { label: "Breathe in...", duration: 4 },
       { label: "Hold...", duration: 7 },
@@ -37,15 +41,40 @@ const BREATH_MODES: BreathMode[] = [
     id: "calm",
     name: "Calm Down (5-5)",
     description: "A gentle, slow 5-second inhale and exhale to bring immediate somatic relief.",
+    isPro: true,
     phases: [
       { label: "Breathe in...", duration: 5 },
       { label: "Breathe out...", duration: 5 },
+    ],
+  },
+  {
+    id: "power",
+    name: "Power Energize (2-1-2)",
+    description: "A brisk stimulating rhythm to awaken mental alertness and fight afternoon fatigue.",
+    isPro: true,
+    phases: [
+      { label: "Breathe in...", duration: 2 },
+      { label: "Hold...", duration: 1 },
+      { label: "Breathe out...", duration: 2 },
+    ],
+  },
+  {
+    id: "sleep",
+    name: "Deep Sleep (4-4-6-2)",
+    description: "An extended restorative exhalation pattern that signals deep relaxation to the vagus nerve.",
+    isPro: true,
+    phases: [
+      { label: "Breathe in...", duration: 4 },
+      { label: "Hold...", duration: 4 },
+      { label: "Breathe out...", duration: 6 },
+      { label: "Hold...", duration: 2 },
     ],
   },
 ];
 
 export const BreatheView: React.FC = () => {
   const navigate = useNavigate();
+  const { isPro, openUpgradeModal } = useSubscription();
   const [activeMode, setActiveMode] = useState<BreathMode>(BREATH_MODES[0]);
   const [isRunning, setIsRunning] = useState(false);
   const [phaseIndex, setPhaseIndex] = useState(0);
@@ -58,6 +87,10 @@ export const BreatheView: React.FC = () => {
 
   // Reset when changing mode
   const handleSelectMode = (mode: BreathMode) => {
+    if (mode.isPro && !isPro) {
+      openUpgradeModal(`Unlock ${mode.name} and all 5 specialized breathing rhythms.`);
+      return;
+    }
     sounds.playClick();
     setIsRunning(false);
     setActiveMode(mode);
@@ -157,27 +190,42 @@ export const BreatheView: React.FC = () => {
         </p>
       </div>
 
-      {/* 3 Modes Selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+      {/* 5 Modes Selector */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-w-5xl mx-auto">
         {BREATH_MODES.map((mode) => {
           const active = activeMode.id === mode.id;
+          const locked = mode.isPro && !isPro;
           return (
             <button
               key={mode.id}
               onClick={() => handleSelectMode(mode)}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative ${
                 active
                   ? "bg-[#00d4ff]/15 border-[#00d4ff] shadow-lg shadow-[#00d4ff]/20 scale-105"
+                  : locked
+                  ? "bg-white/5 border-white/10 hover:border-[#FFD700]/40 opacity-75 hover:opacity-100"
                   : "bg-white/5 border-white/10 hover:bg-white/10"
               }`}
             >
               <div>
-                <h3 className="text-sm font-bold text-white">{mode.name}</h3>
-                <p className="text-xs text-white/50 mt-1 leading-relaxed">{mode.description}</p>
+                <div className="flex items-start justify-between gap-1 mb-1">
+                  <h3 className="text-xs sm:text-sm font-bold text-white leading-tight">{mode.name}</h3>
+                  {locked && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30 shrink-0 flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" /> PRO
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-white/50 leading-relaxed line-clamp-2">{mode.description}</p>
               </div>
               {active && (
-                <span className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-wider mt-3 block">
+                <span className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-wider mt-2 block">
                   Active Rhythm &bull;
+                </span>
+              )}
+              {locked && (
+                <span className="text-[10px] font-semibold text-[#FFD700] uppercase tracking-wider mt-2 block">
+                  Click to unlock &rarr;
                 </span>
               )}
             </button>

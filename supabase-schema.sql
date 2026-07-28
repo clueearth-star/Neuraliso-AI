@@ -10,9 +10,21 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL DEFAULT 'Wellness Explorer',
   avatar_url TEXT,
+  subscription_tier TEXT DEFAULT 'free',
+  subscription_status TEXT DEFAULT 'inactive',
+  subscription_expires_at TIMESTAMPTZ,
+  dodo_customer_id TEXT,
+  dodo_subscription_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- For existing databases: safely add subscription columns if they don't exist yet
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'inactive';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS dodo_customer_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS dodo_subscription_id TEXT;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 

@@ -24,11 +24,14 @@ import {
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
 import { useAuth } from "../contexts/AuthContext";
+import { useSubscription } from "../contexts/SubscriptionContext";
+import { ProBadge } from "./subscription/ProBadge";
 import neuralisoLogo from "../assets/images/neuraliso_logo_1783904719183.jpg";
 
 export const AppNav: React.FC = () => {
   const location = useLocation();
   const { user, profile, signOut, syncStatus, syncMessage, isAnonymous } = useAuth();
+  const { isPro, openUpgradeModal } = useSubscription();
   
   const [isMuted, setIsMuted] = useState(sounds.getMuteState());
   const [streak, setStreak] = useState(storage.getStreak());
@@ -158,6 +161,8 @@ export const AppNav: React.FC = () => {
                   <span className="text-xs font-semibold text-white/90 hidden sm:inline max-w-[100px] truncate">
                     {displayName}
                   </span>
+                  
+                  <ProBadge showIfFree={false} />
 
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-xs flex items-center justify-center shadow-sm overflow-hidden">
                     {profile?.avatar_url ? (
@@ -173,8 +178,11 @@ export const AppNav: React.FC = () => {
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#111A2E] border border-white/15 shadow-2xl backdrop-blur-2xl p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150 z-50">
                     <div className="px-3 py-2 border-b border-white/10">
-                      <p className="text-xs font-bold text-white truncate">{displayName}</p>
-                      <p className="text-[11px] text-white/50 truncate">{user.email}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                        <ProBadge showIfFree={true} />
+                      </div>
+                      <p className="text-[11px] text-white/50 truncate mt-0.5">{user.email}</p>
                       {syncMessage && (
                         <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-medium">
                           <CheckCircle2 className="w-3 h-3" />
@@ -182,6 +190,21 @@ export const AppNav: React.FC = () => {
                         </p>
                       )}
                     </div>
+
+                    <Link
+                      to="/app/pricing"
+                      onClick={() => {
+                        sounds.playClick();
+                        setShowUserMenu(false);
+                      }}
+                      className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Flame className="w-4 h-4 text-[#FFD700]" />
+                        <span>{isPro ? "Subscription Plan" : "Upgrade to Plus"}</span>
+                      </span>
+                      {!isPro && <span className="px-1.5 py-0.5 rounded text-[9px] bg-[#FFD700] text-[#0B1121] font-bold">PRO</span>}
+                    </Link>
 
                     <Link
                       to="/app/settings"

@@ -4,9 +4,12 @@ import { RefreshCw, Check, ArrowRight, ShieldCheck, Clock, Trash2, Sparkles, Hel
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { ReframeEntry } from "../types";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 export const ReframeView: React.FC = () => {
   const navigate = useNavigate();
+  const { isPro, reframesThisWeek, checkFeatureAccess, openUpgradeModal, refreshUsageCounts } = useSubscription();
+  const canLogReframe = checkFeatureAccess("reframe");
   const [reframes, setReframes] = useState<ReframeEntry[]>([]);
   
   // Form state
@@ -28,6 +31,11 @@ export const ReframeView: React.FC = () => {
     e.preventDefault();
     if (!automaticThought.trim() || !balancedThought.trim()) return;
 
+    if (!canLogReframe && !isPro) {
+      openUpgradeModal("You've used 3 of 3 CBT thought reframes this week. Upgrade for unlimited reframes + sleep sounds + AI companion.");
+      return;
+    }
+
     sounds.playSuccess();
     storage.saveReframe({
       situation: situation.trim() || "Unspecified situation",
@@ -42,6 +50,7 @@ export const ReframeView: React.FC = () => {
     setBalancedThought("");
     setShowSuccess(true);
     reloadData();
+    refreshUsageCounts();
 
     setTimeout(() => {
       setShowSuccess(false);
@@ -159,20 +168,48 @@ export const ReframeView: React.FC = () => {
             />
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={!automaticThought.trim() || !balancedThought.trim()}
-              className={`w-full py-4 rounded-full font-bold text-base transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                automaticThought.trim() && balancedThought.trim()
-                  ? "bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] shadow-lg shadow-[#00d4ff]/25 hover:scale-105 active:scale-95"
-                  : "bg-white/10 text-white/30 cursor-not-allowed"
-              }`}
-            >
-              <span>Save Reframe Entry</span>
-              <Sparkles className="w-5 h-5" />
-            </button>
+          {/* Submit Button & Upgrade Banner */}
+          <div className="pt-4 space-y-4">
+            {!canLogReframe && !isPro ? (
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-[#FFD700]/15 via-[#FFA500]/10 to-[#FFD700]/15 border border-[#FFD700]/40 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFD700]/20 text-[#FFD700] text-xs font-bold">
+                    <Sparkles className="w-3.5 h-3.5" /> Weekly Limit Reached
+                  </div>
+                  <h3 className="font-bold text-base">You&apos;ve used 3 of 3 reframes this week</h3>
+                  <p className="text-xs text-slate-300">
+                    Upgrade for unlimited CBT reframes + sleep sounds + AI companion.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openUpgradeModal("Unlimited CBT thought reframes")}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#ffe244] text-[#0B1121] font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer"
+                  >
+                    See what&apos;s included
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={!automaticThought.trim() || !balancedThought.trim()}
+                className={`w-full py-4 rounded-full font-bold text-base transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  automaticThought.trim() && balancedThought.trim()
+                    ? "bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] shadow-lg shadow-[#00d4ff]/25 hover:scale-105 active:scale-95"
+                    : "bg-white/10 text-white/30 cursor-not-allowed"
+                }`}
+              >
+                <span>Save Reframe Entry</span>
+                <Sparkles className="w-5 h-5" />
+              </button>
+            )}
+            {!isPro && (
+              <div className="text-center text-xs text-slate-400">
+                <span>Reframes used this week: <strong className="text-white">{reframesThisWeek}/3</strong> (Free Tier)</span>
+              </div>
+            )}
           </div>
 
           {showSuccess && (

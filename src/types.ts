@@ -68,3 +68,18 @@ export interface CrisisLog {
   message: string;
 }
 
+export type SubscriptionTier = "free" | "pro";
+export type SubscriptionStatus = "active" | "inactive" | "cancelled" | "trial";
+export type BillingPeriod = "monthly" | "yearly";
+
+export interface UserSubscription {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  expiresAt: string | null; // ISO string
+  dodoCustomerId?: string;
+  dodoSubscriptionId?: string;
+  billingPeriod?: BillingPeriod;
+  isTrial?: boolean;
+}
+
+

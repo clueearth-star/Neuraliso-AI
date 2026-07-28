@@ -37,7 +37,7 @@ class SoundEngine {
     }
   }
 
-  public startSleepSound(type: "rain" | "white" | "brown" | "binaural", volume: number = 0.5) {
+  public startSleepSound(type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest", volume: number = 0.5) {
     this.init();
     this.stopSleepSound();
     if (!this.ctx || !this.masterGain) return;
@@ -48,16 +48,16 @@ class SoundEngine {
     this.activeSleepGain.gain.linearRampToValueAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime + 1.5);
     this.activeSleepGain.connect(this.masterGain);
 
-    if (type === "white" || type === "brown" || type === "rain") {
+    if (type === "white" || type === "brown" || type === "rain" || type === "ocean" || type === "forest") {
       const bufferSize = 2 * this.ctx.sampleRate; // 2 seconds buffer
       const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
 
-      if (type === "white") {
+      if (type === "white" || type === "forest") {
         for (let i = 0; i < bufferSize; i++) {
           output[i] = Math.random() * 2 - 1;
         }
-      } else if (type === "brown" || type === "rain") {
+      } else if (type === "brown" || type === "rain" || type === "ocean") {
         let lastOut = 0.0;
         for (let i = 0; i < bufferSize; i++) {
           const white = Math.random() * 2 - 1;
@@ -67,22 +67,49 @@ class SoundEngine {
         }
       }
 
-      const whiteNoise = this.ctx.createBufferSource();
-      whiteNoise.buffer = noiseBuffer;
-      whiteNoise.loop = true;
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      noiseSource.loop = true;
 
       if (type === "rain") {
         const filter = this.ctx.createBiquadFilter();
         filter.type = "lowpass";
         filter.frequency.setValueAtTime(850, this.ctx.currentTime);
-        whiteNoise.connect(filter);
+        noiseSource.connect(filter);
+        filter.connect(this.activeSleepGain);
+      } else if (type === "ocean") {
+        // Modulated lowpass filter for wave effect
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(400, this.ctx.currentTime);
+        
+        // Create an LFO for waves
+        const lfo = this.ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 0.12; // ~8 second wave cycle
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 350; // swing between 50Hz and 750Hz
+        lfo.connect(lfoGain);
+        lfoGain.connect(filter.frequency);
+
+        noiseSource.connect(filter);
+        filter.connect(this.activeSleepGain);
+        lfo.start();
+        this.activeSleepSource.push(lfo);
+      } else if (type === "forest") {
+        // Soft wind bandpass
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(1100, this.ctx.currentTime);
+        filter.Q.value = 1.5;
+        noiseSource.connect(filter);
         filter.connect(this.activeSleepGain);
       } else {
-        whiteNoise.connect(this.activeSleepGain);
+        noiseSource.connect(this.activeSleepGain);
       }
 
-      whiteNoise.start();
-      this.activeSleepSource.push(whiteNoise);
+      noiseSource.start();
+      this.activeSleepSource.push(noiseSource);
     } else if (type === "binaural") {
       // 432 Hz fundamental theta wave binaural beat (Left: 216Hz, Right: 222Hz = 6Hz theta frequency)
       const merger = this.ctx.createChannelMerger(2);

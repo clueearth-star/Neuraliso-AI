@@ -1,4 +1,4 @@
-import { MoodEntry, ReframeEntry, AppSettings, OnboardingState, ActivityLog, ChatMessage, CrisisLog } from "../types";
+import { MoodEntry, ReframeEntry, AppSettings, OnboardingState, ActivityLog, ChatMessage, CrisisLog, UserSubscription } from "../types";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
 const ONBOARDING_KEY = "neuraliso_onboarding_v2";
@@ -8,6 +8,13 @@ const REFRAMES_KEY = "neuraliso_reframes_v2";
 const ACTIVITIES_KEY = "neuraliso_activities_v2";
 const CHAT_KEY = "neuraliso_chat_history";
 const CRISIS_LOG_KEY = "neuraliso_crisis_logs";
+const SUBSCRIPTION_KEY = "neuraliso_subscription_v2";
+
+const DEFAULT_SUBSCRIPTION: UserSubscription = {
+  tier: "free",
+  status: "inactive",
+  expiresAt: null,
+};
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
@@ -23,6 +30,23 @@ const DEFAULT_ONBOARDING: OnboardingState = {
 };
 
 export const storage = {
+  getSubscription(): UserSubscription {
+    try {
+      const data = localStorage.getItem(SUBSCRIPTION_KEY);
+      return data ? { ...DEFAULT_SUBSCRIPTION, ...JSON.parse(data) } : DEFAULT_SUBSCRIPTION;
+    } catch {
+      return DEFAULT_SUBSCRIPTION;
+    }
+  },
+
+  saveSubscription(sub: UserSubscription): void {
+    try {
+      localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(sub));
+    } catch (e) {
+      console.error("Failed to save subscription", e);
+    }
+  },
+
   getOnboarding(): OnboardingState {
     try {
       const data = localStorage.getItem(ONBOARDING_KEY);

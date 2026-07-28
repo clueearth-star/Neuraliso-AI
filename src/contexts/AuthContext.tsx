@@ -7,6 +7,11 @@ export interface UserProfile {
   id: string;
   name: string;
   avatar_url?: string;
+  subscription_tier?: string;
+  subscription_status?: string;
+  subscription_expires_at?: string;
+  dodo_customer_id?: string;
+  dodo_subscription_id?: string;
 }
 
 export interface AuthContextType {

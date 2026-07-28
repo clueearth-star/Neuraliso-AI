@@ -3,43 +3,64 @@ import { useNavigate } from "react-router-dom";
 import { Moon, Play, Pause, Volume2, VolumeX, Clock, CloudRain, Radio, Disc, Sparkles, Bot, MessageCircle } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 interface SoundItem {
-  id: "rain" | "white" | "brown" | "binaural";
+  id: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest";
   name: string;
   description: string;
   icon: React.ReactNode;
+  isPro?: boolean;
 }
 
 const SLEEP_SOUNDS: SoundItem[] = [
   {
     id: "rain",
     name: "Gentle Rain & Thunder",
-    description: "Soft synthesized raindrops filtered through pink noise for continuous acoustic shelter.",
+    description: "Soft synthesized raindrops filtered through pink noise for continuous acoustic shelter. Always free.",
     icon: <CloudRain className="w-6 h-6 text-cyan-400" />,
+    isPro: false,
   },
   {
     id: "white",
     name: "Pure White Noise",
     description: "Full-spectrum acoustic masking that blocks sudden background room noises and distractions.",
     icon: <Radio className="w-6 h-6 text-slate-300" />,
+    isPro: true,
   },
   {
     id: "brown",
     name: "Deep Brown Noise",
     description: "A warm, deep low-frequency ocean rumble that soothes executive brain chatter.",
     icon: <Disc className="w-6 h-6 text-amber-500" />,
+    isPro: true,
   },
   {
     id: "binaural",
     name: "432Hz Theta Binaural Beats",
     description: "6Hz difference frequency (216Hz/222Hz) designed to encourage slow-wave relaxation and sleep.",
     icon: <Sparkles className="w-6 h-6 text-indigo-400" />,
+    isPro: true,
+  },
+  {
+    id: "ocean",
+    name: "Pacific Ocean Surf",
+    description: "Rhythmic rolling waves that synchronize respiratory rate with natural coastal tides.",
+    icon: <Radio className="w-6 h-6 text-teal-400" />,
+    isPro: true,
+  },
+  {
+    id: "forest",
+    name: "Midnight Forest Wind",
+    description: "Gentle breeze rustling through pine needles with subtle nocturnal ambient acoustics.",
+    icon: <Sparkles className="w-6 h-6 text-emerald-400" />,
+    isPro: true,
   },
 ];
 
 export const SleepSoundsView: React.FC = () => {
   const navigate = useNavigate();
+  const { isPro, openUpgradeModal } = useSubscription();
   const [activeSound, setActiveSound] = useState<string | null>(null);
   const [volume, setVolume] = useState<number>(0.6);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null); // null = all night
@@ -48,6 +69,11 @@ export const SleepSoundsView: React.FC = () => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handlePlayPause = (id: SoundItem["id"]) => {
+    const item = SLEEP_SOUNDS.find((s) => s.id === id);
+    if (item?.isPro && !isPro) {
+      openUpgradeModal(`Unlock ${item.name} and all 6 restorative ambient sleep soundscapes.`);
+      return;
+    }
     sounds.playClick();
     if (activeSound === id) {
       // Pause
@@ -197,16 +223,19 @@ export const SleepSoundsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 4 Sound Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* 6 Sound Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {SLEEP_SOUNDS.map((sound) => {
           const isPlaying = activeSound === sound.id;
+          const locked = sound.isPro && !isPro;
           return (
             <div
               key={sound.id}
-              className={`wellness-card p-6 sm:p-8 space-y-6 flex flex-col justify-between transition-all ${
+              className={`wellness-card p-6 sm:p-8 space-y-6 flex flex-col justify-between transition-all relative ${
                 isPlaying
                   ? "border-[#00d4ff] bg-[#00d4ff]/5 shadow-xl shadow-[#00d4ff]/10"
+                  : locked
+                  ? "border-white/10 opacity-80 hover:opacity-100 hover:border-[#FFD700]/40"
                   : ""
               }`}
             >
@@ -218,7 +247,14 @@ export const SleepSoundsView: React.FC = () => {
                     {sound.icon}
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">{sound.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug">{sound.name}</h3>
+                      {locked && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30 shrink-0 flex items-center gap-0.5">
+                          <Sparkles className="w-2.5 h-2.5" /> PRO
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-white/50">Procedural Web Audio</span>
                   </div>
                 </div>
@@ -240,7 +276,7 @@ export const SleepSoundsView: React.FC = () => {
 
               <div className="pt-2 border-t border-white/5 flex items-center justify-between">
                 <span className="text-xs font-semibold text-white/40">
-                  {isPlaying ? "Now Playing..." : "Ready to play"}
+                  {isPlaying ? "Now Playing..." : locked ? "Plus Feature" : "Ready to play"}
                 </span>
 
                 <button
@@ -248,6 +284,8 @@ export const SleepSoundsView: React.FC = () => {
                   className={`px-6 py-2.5 rounded-full font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                     isPlaying
                       ? "bg-rose-500 text-white shadow-md shadow-rose-500/30 hover:bg-rose-600"
+                      : locked
+                      ? "bg-gradient-to-r from-[#FFD700]/20 to-[#FFA500]/20 text-[#FFD700] border border-[#FFD700]/40 hover:bg-[#FFD700]/30"
                       : "bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] shadow-md shadow-[#00d4ff]/20 hover:scale-105"
                   }`}
                 >
@@ -255,6 +293,11 @@ export const SleepSoundsView: React.FC = () => {
                     <>
                       <Pause className="w-4 h-4 fill-current" />
                       <span>Pause</span>
+                    </>
+                  ) : locked ? (
+                    <>
+                      <Sparkles className="w-4 h-4 text-[#FFD700]" />
+                      <span>Unlock Plus</span>
                     </>
                   ) : (
                     <>

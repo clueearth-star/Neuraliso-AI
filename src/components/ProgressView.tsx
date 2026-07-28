@@ -26,8 +26,11 @@ import {
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
 import { MoodEntry } from "../types";
+import { useSubscription } from "../contexts/SubscriptionContext";
 
 export const ProgressView: React.FC = () => {
+  const { isPro, openUpgradeModal } = useSubscription();
+  const [timeRange, setTimeRange] = useState<"7d" | "30d" | "all">("7d");
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [streak, setStreak] = useState<number>(0);
@@ -184,12 +187,56 @@ export const ProgressView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Line chart of mood scores over time (7 Cols) */}
         <div className="lg:col-span-7 wellness-card p-6 sm:p-8 space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#00d4ff]" />
-              <span>Mood Score Over Time (Last 7 Days)</span>
-            </h2>
-            <p className="text-xs text-white/50 mt-0.5">Scale: 1 (Sad) to 5 (Great)</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-[#00d4ff]" />
+                <span>Mood Score Over Time</span>
+              </h2>
+              <p className="text-xs text-white/50 mt-0.5">Scale: 1 (Sad) to 5 (Great)</p>
+            </div>
+
+            {/* Time range selector */}
+            <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10 text-xs">
+              <button
+                onClick={() => setTimeRange("7d")}
+                className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  timeRange === "7d" ? "bg-[#00d4ff] text-[#0B1121] shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => {
+                  if (!isPro) {
+                    openUpgradeModal("Unlock 30-day and all-time progress analytics, trends, and CSV data export.");
+                    return;
+                  }
+                  setTimeRange("30d");
+                }}
+                className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  timeRange === "30d" ? "bg-[#FFD700] text-[#0B1121] shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>30 Days</span>
+                {!isPro && <Sparkles className="w-3 h-3 text-[#FFD700]" />}
+              </button>
+              <button
+                onClick={() => {
+                  if (!isPro) {
+                    openUpgradeModal("Unlock 30-day and all-time progress analytics, trends, and CSV data export.");
+                    return;
+                  }
+                  setTimeRange("all");
+                }}
+                className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  timeRange === "all" ? "bg-[#FFD700] text-[#0B1121] shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>All Time</span>
+                {!isPro && <Sparkles className="w-3 h-3 text-[#FFD700]" />}
+              </button>
+            </div>
           </div>
 
           <div className="h-64 w-full pt-2">

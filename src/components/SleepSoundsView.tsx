@@ -1,12 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Moon, Play, Pause, Volume2, VolumeX, Clock, CloudRain, Radio, Disc, Sparkles, Bot, MessageCircle } from "lucide-react";
+import {
+  Moon,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Clock,
+  CloudRain,
+  Radio,
+  Disc,
+  Sparkles,
+  Bot,
+  MessageCircle,
+  Sliders,
+  Square,
+  Wand2,
+  X
+} from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
 import { useSubscription } from "../contexts/SubscriptionContext";
 
+type SoundId = "rain" | "white" | "brown" | "binaural" | "ocean" | "forest";
+
 interface SoundItem {
-  id: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest";
+  id: SoundId;
   name: string;
   description: string;
   icon: React.ReactNode;
@@ -58,40 +77,132 @@ const SLEEP_SOUNDS: SoundItem[] = [
   },
 ];
 
+interface SoundPreset {
+  name: string;
+  icon: string;
+  tracks: Partial<Record<SoundId, number>>;
+}
+
+const MIX_PRESETS: SoundPreset[] = [
+  {
+    name: "Stormy Shelter",
+    icon: "🌧️",
+    tracks: { rain: 0.8, brown: 0.4 },
+  },
+  {
+    name: "Deep Delta Sleep",
+    icon: "🧘",
+    tracks: { binaural: 0.7, white: 0.3 },
+  },
+  {
+    name: "Coastal Forest",
+    icon: "🌊",
+    tracks: { ocean: 0.75, forest: 0.5 },
+  },
+];
+
 export const SleepSoundsView: React.FC = () => {
   const navigate = useNavigate();
   const { isPro, openUpgradeModal } = useSubscription();
-  const [activeSound, setActiveSound] = useState<string | null>(null);
-  const [volume, setVolume] = useState<number>(0.6);
+
+  // Active track volumes map: { [soundId]: volume }
+  const [activeTracks, setActiveTracks] = useState<Partial<Record<SoundId, number>>>({});
+  const [masterVolume, setMasterVolume] = useState<number>(0.7);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(null); // null = all night
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handlePlayPause = (id: SoundItem["id"]) => {
+  // Sync state on mount if audio is already playing
+  useEffect(() => {
+    const existingActive = sounds.getActiveSleepTracks();
+    if (existingActive.length > 0) {
+      const initialMap: Partial<Record<SoundId, number>> = {};
+      existingActive.forEach((id) => {
+        initialMap[id] = 0.6;
+      });
+      setActiveTracks(initialMap);
+    }
+  }, []);
+
+  const hasActiveTracks = Object.keys(activeTracks).length > 0;
+
+  const handleToggleTrack = (id: SoundId) => {
     const item = SLEEP_SOUNDS.find((s) => s.id === id);
     if (item?.isPro && !isPro) {
       openUpgradeModal(`Unlock ${item.name} and all 6 restorative ambient sleep soundscapes.`);
       return;
     }
+
     sounds.playClick();
-    if (activeSound === id) {
-      // Pause
-      sounds.stopSleepSound();
-      setActiveSound(null);
+
+    if (activeTracks[id] !== undefined) {
+      // Track is playing -> stop it
+      sounds.stopSleepTrack(id);
+      setActiveTracks((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } else {
-      // Play new sound
-      sounds.startSleepSound(id, volume);
-      setActiveSound(id);
-      storage.logActivity("sleep", `Playing ${id} sound`, "Sleep ambient audio started");
+      // Start track
+      const defaultVol = 0.6;
+      sounds.startSleepTrack(id, defaultVol);
+      setActiveTracks((prev) => ({
+        ...prev,
+        [id]: defaultVol,
+      }));
+      storage.logActivity("sleep", `Playing ${id} sound`, "Sleep ambient audio track added");
     }
   };
 
-  const handleVolumeChange = (newVal: number) => {
-    setVolume(newVal);
-    if (activeSound) {
-      sounds.setSleepVolume(newVal);
+  const handleTrackVolumeChange = (id: SoundId, newVol: number) => {
+    sounds.setSleepTrackVolume(id, newVol);
+    setActiveTracks((prev) => ({
+      ...prev,
+      [id]: newVol,
+    }));
+  };
+
+  const handleMasterVolumeChange = (newVal: number) => {
+    setMasterVolume(newVal);
+    sounds.setSleepVolume(newVal);
+  };
+
+  const handleStopAll = () => {
+    sounds.playClick();
+    sounds.stopSleepSound();
+    setActiveTracks({});
+  };
+
+  const handleApplyPreset = (preset: SoundPreset) => {
+    sounds.playClick();
+
+    // Check pro requirements
+    const requiresPro = Object.keys(preset.tracks).some((id) => {
+      const item = SLEEP_SOUNDS.find((s) => s.id === id);
+      return item?.isPro && !isPro;
+    });
+
+    if (requiresPro) {
+      openUpgradeModal(`Unlock Plus to experience multi-sound ambient presets.`);
+      return;
     }
+
+    // Stop existing sound
+    sounds.stopSleepSound();
+
+    // Start each track in preset
+    const nextMap: Partial<Record<SoundId, number>> = {};
+    Object.entries(preset.tracks).forEach(([idStr, vol]) => {
+      const id = idStr as SoundId;
+      const v = vol || 0.6;
+      sounds.startSleepTrack(id, v);
+      nextMap[id] = v;
+    });
+
+    setActiveTracks(nextMap);
+    storage.logActivity("sleep", `Applied ${preset.name} ambient mix`, "Multi-track sleep audio preset activated");
   };
 
   const handleSelectTimer = (mins: number | null) => {
@@ -104,14 +215,15 @@ export const SleepSoundsView: React.FC = () => {
     }
   };
 
+  // Timer countdown hook
   useEffect(() => {
-    if (secondsRemaining !== null && secondsRemaining > 0 && activeSound) {
+    if (secondsRemaining !== null && secondsRemaining > 0 && hasActiveTracks) {
       timerRef.current = setInterval(() => {
         setSecondsRemaining((prev) => {
           if (prev !== null && prev <= 1) {
             // Timer expired! Stop audio
             sounds.stopSleepSound();
-            setActiveSound(null);
+            setActiveTracks({});
             return 0;
           }
           return prev !== null ? prev - 1 : null;
@@ -124,7 +236,7 @@ export const SleepSoundsView: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [secondsRemaining, activeSound]);
+  }, [secondsRemaining, hasActiveTracks]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -140,40 +252,40 @@ export const SleepSoundsView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-12 pb-28 md:pb-12 animate-page-in text-left">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10 pb-28 md:pb-12 animate-page-in text-left">
       {/* Header */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
           <Moon className="w-3.5 h-3.5" />
-          <span>Acoustic Sanctuary</span>
+          <span>Multi-Track Sound Mixer</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Sleep Sounds &amp; Stories
+          Sleep Sound Mixer &amp; Stories
         </h1>
         <p className="text-sm sm:text-base text-white/60">
-          Calming sounds generated continuously in real time using your browser&apos;s Web Audio API. Zero interruptions.
+          Combine multiple ambient soundscapes simultaneously with custom volume levels. Real-time procedural Web Audio.
         </p>
       </div>
 
-      {/* Sleep Timer & Volume Controls Bar */}
+      {/* Main Control Panel: Presets, Master Volume, & Timer */}
       <div className="wellness-card p-6 sm:p-8 space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b border-white/10 pb-6">
-          {/* Volume Slider */}
+          {/* Master Volume Slider */}
           <div className="space-y-2 w-full md:w-1/2">
             <div className="flex items-center justify-between text-xs font-bold text-white/80">
               <span className="flex items-center gap-1.5">
                 <Volume2 className="w-4 h-4 text-[#00d4ff]" />
-                <span>Master Volume</span>
+                <span>Master Sound Engine Volume</span>
               </span>
-              <span className="font-mono text-[#00d4ff]">{Math.round(volume * 100)}%</span>
+              <span className="font-mono text-[#00d4ff]">{Math.round(masterVolume * 100)}%</span>
             </div>
             <input
               type="range"
               min="0"
               max="1"
               step="0.05"
-              value={volume}
-              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              value={masterVolume}
+              onChange={(e) => handleMasterVolumeChange(parseFloat(e.target.value))}
               className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#00d4ff]"
             />
           </div>
@@ -182,9 +294,9 @@ export const SleepSoundsView: React.FC = () => {
           <div className="flex items-center gap-3 bg-black/30 px-4 py-3 rounded-2xl border border-white/10 w-full md:w-auto">
             <Clock className="w-5 h-5 text-indigo-400 shrink-0" />
             <div>
-              <span className="text-xs text-white/50 block">Sleep Timer</span>
+              <span className="text-xs text-white/50 block">Sleep Auto-Stop Timer</span>
               <span className="text-sm font-bold text-white">
-                {secondsRemaining !== null && activeSound
+                {secondsRemaining !== null && hasActiveTracks
                   ? formatTimerDisplay(secondsRemaining)
                   : timerMinutes === null
                   ? "All night (Continuous)"
@@ -194,40 +306,133 @@ export const SleepSoundsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Timer Presets */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-white/70 block">Select Auto-Stop Timer Duration:</label>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "15 min", value: 15 },
-              { label: "30 min", value: 30 },
-              { label: "1 hour", value: 60 },
-              { label: "All night", value: null },
-            ].map((preset) => {
-              const selected = timerMinutes === preset.value;
-              return (
+        {/* Preset Soundscapes & Timer Duration Selectors */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          {/* Quick Soundscape Presets */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-white/70 flex items-center gap-1.5">
+              <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Multi-Track Soundscape Presets:</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {MIX_PRESETS.map((preset) => (
                 <button
-                  key={preset.label}
-                  onClick={() => handleSelectTimer(preset.value)}
-                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    selected
-                      ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30 scale-105"
-                      : "bg-white/5 border border-white/10 hover:bg-white/10 text-white/70"
-                  }`}
+                  key={preset.name}
+                  onClick={() => handleApplyPreset(preset)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 hover:bg-indigo-500/20 hover:border-indigo-400/50 text-white transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  {preset.label}
+                  <span>{preset.icon}</span>
+                  <span>{preset.name}</span>
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Timer Duration Selection */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-white/70 block">Auto-Stop Timer Preset:</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "15 min", value: 15 },
+                { label: "30 min", value: 30 },
+                { label: "1 hour", value: 60 },
+                { label: "All night", value: null },
+              ].map((preset) => {
+                const selected = timerMinutes === preset.value;
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleSelectTimer(preset.value)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selected
+                        ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30 scale-105"
+                        : "bg-white/5 border border-white/10 hover:bg-white/10 text-white/70"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Active Sound Mixer Toolbar (Shows when 1 or more tracks are playing) */}
+      {hasActiveTracks && (
+        <div className="p-5 rounded-3xl bg-indigo-950/40 border border-indigo-500/30 backdrop-blur-md space-y-4 shadow-xl animate-fade-in">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[#00d4ff]" />
+              <h3 className="text-sm font-bold text-white">
+                Active Sound Mix ({Object.keys(activeTracks).length} Track{Object.keys(activeTracks).length > 1 ? "s" : ""} Layered)
+              </h3>
+            </div>
+            <button
+              onClick={handleStopAll}
+              className="px-3 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>Stop All</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(activeTracks).map(([idStr, vol]) => {
+              const id = idStr as SoundId;
+              const sound = SLEEP_SOUNDS.find((s) => s.id === id);
+              if (!sound) return null;
+              const trackVolume = typeof vol === "number" ? vol : 0.6;
+              return (
+                <div
+                  key={id}
+                  className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-2 flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-white/5 border border-white/10">
+                        {sound.icon}
+                      </div>
+                      <span className="text-xs font-bold text-white">{sound.name}</span>
+                    </div>
+                    <button
+                      onClick={() => handleToggleTrack(id)}
+                      className="p-1 rounded-lg text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      title="Remove from mix"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-white/60 font-mono">
+                      <span>Track Volume</span>
+                      <span className="text-[#00d4ff]">{Math.round(trackVolume * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={trackVolume}
+                      onChange={(e) => handleTrackVolumeChange(id, parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#00d4ff]"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 6 Sound Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {SLEEP_SOUNDS.map((sound) => {
-          const isPlaying = activeSound === sound.id;
+          const isPlaying = activeTracks[sound.id] !== undefined;
+          const trackVol = activeTracks[sound.id] ?? 0.6;
           const locked = sound.isPro && !isPro;
+
           return (
             <div
               key={sound.id}
@@ -239,49 +444,89 @@ export const SleepSoundsView: React.FC = () => {
                   : ""
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className={`p-3.5 rounded-2xl border transition-all ${
-                    isPlaying ? "bg-[#00d4ff]/20 border-[#00d4ff]" : "bg-white/5 border-white/10"
-                  }`}>
-                    {sound.icon}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base sm:text-lg font-bold text-white leading-snug">{sound.name}</h3>
-                      {locked && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30 shrink-0 flex items-center gap-0.5">
-                          <Sparkles className="w-2.5 h-2.5" /> PRO
-                        </span>
-                      )}
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className={`p-3.5 rounded-2xl border transition-all ${
+                        isPlaying ? "bg-[#00d4ff]/20 border-[#00d4ff]" : "bg-white/5 border-white/10"
+                      }`}
+                    >
+                      {sound.icon}
                     </div>
-                    <span className="text-xs text-white/50">Procedural Web Audio</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-white leading-snug">
+                          {sound.name}
+                        </h3>
+                        {locked && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30 shrink-0 flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> PRO
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-white/50">Procedural Web Audio</span>
+                    </div>
                   </div>
+
+                  {/* Waveform Animation when playing */}
+                  {isPlaying && (
+                    <div className="flex items-center gap-1 h-6 px-3 py-1 rounded-full bg-[#00d4ff]/20 border border-[#00d4ff]/30 shrink-0">
+                      <span
+                        className="w-1 h-4 bg-[#00d4ff] rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <span
+                        className="w-1 h-2 bg-[#00d4ff] rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <span
+                        className="w-1 h-5 bg-[#00d4ff] rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
+                      <span
+                        className="w-1 h-3 bg-[#00d4ff] rounded-full animate-bounce"
+                        style={{ animationDelay: "450ms" }}
+                      />
+                    </div>
+                  )}
                 </div>
 
-                {/* Waveform Animation when playing */}
-                {isPlaying && (
-                  <div className="flex items-center gap-1 h-6 px-3 py-1 rounded-full bg-[#00d4ff]/20 border border-[#00d4ff]/30 shrink-0">
-                    <span className="w-1 h-4 bg-[#00d4ff] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1 h-2 bg-[#00d4ff] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1 h-5 bg-[#00d4ff] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    <span className="w-1 h-3 bg-[#00d4ff] rounded-full animate-bounce" style={{ animationDelay: "450ms" }} />
-                  </div>
-                )}
+                <p className="text-xs sm:text-sm text-white/70 leading-relaxed min-h-[40px]">
+                  {sound.description}
+                </p>
               </div>
 
-              <p className="text-xs sm:text-sm text-white/70 leading-relaxed min-h-[40px]">
-                {sound.description}
-              </p>
+              {/* Individual Track Volume Slider when Active */}
+              {isPlaying ? (
+                <div className="p-3 rounded-2xl bg-black/30 border border-[#00d4ff]/30 space-y-1.5 animate-fade-in">
+                  <div className="flex items-center justify-between text-xs font-semibold text-white/80">
+                    <span className="flex items-center gap-1 text-[#00d4ff]">
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Individual Track Volume</span>
+                    </span>
+                    <span className="font-mono text-[#00d4ff]">{Math.round(trackVol * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={trackVol}
+                    onChange={(e) => handleTrackVolumeChange(sound.id, parseFloat(e.target.value))}
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#00d4ff]"
+                  />
+                </div>
+              ) : null}
 
               <div className="pt-2 border-t border-white/5 flex items-center justify-between">
                 <span className="text-xs font-semibold text-white/40">
-                  {isPlaying ? "Now Playing..." : locked ? "Plus Feature" : "Ready to play"}
+                  {isPlaying ? "Active in Mix" : locked ? "Plus Feature" : "Ready to Mix"}
                 </span>
 
                 <button
-                  onClick={() => handlePlayPause(sound.id)}
-                  className={`px-6 py-2.5 rounded-full font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+                  onClick={() => handleToggleTrack(sound.id)}
+                  className={`px-5 py-2.5 rounded-full font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                     isPlaying
                       ? "bg-rose-500 text-white shadow-md shadow-rose-500/30 hover:bg-rose-600"
                       : locked
@@ -292,7 +537,7 @@ export const SleepSoundsView: React.FC = () => {
                   {isPlaying ? (
                     <>
                       <Pause className="w-4 h-4 fill-current" />
-                      <span>Pause</span>
+                      <span>Remove Track</span>
                     </>
                   ) : locked ? (
                     <>
@@ -302,7 +547,7 @@ export const SleepSoundsView: React.FC = () => {
                   ) : (
                     <>
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Play Sound</span>
+                      <span>Add to Mix</span>
                     </>
                   )}
                 </button>
@@ -313,13 +558,13 @@ export const SleepSoundsView: React.FC = () => {
       </div>
 
       {/* Sleep Story AI Banner Card */}
-      <div 
+      <div
         onClick={() => {
           sounds.playClick();
-          navigate("/app/chat", { 
-            state: { 
-              initialPrompt: "Tell me a calming sleep story to help me drift off peacefully tonight." 
-            } 
+          navigate("/app/chat", {
+            state: {
+              initialPrompt: "Tell me a calming sleep story to help me drift off peacefully tonight.",
+            },
           });
         }}
         className="wellness-card p-6 sm:p-8 bg-gradient-to-r from-[#131C31] via-[#1A2338] to-indigo-950/40 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-indigo-400 transition-all duration-300 group cursor-pointer shadow-xl max-w-3xl mx-auto"
@@ -346,3 +591,4 @@ export const SleepSoundsView: React.FC = () => {
     </div>
   );
 };
+

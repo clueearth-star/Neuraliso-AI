@@ -10,9 +10,10 @@ class SoundEngine {
   private isMuted: boolean = false;
   private soundLog: Array<{ id: string; name: string; timestamp: string }> = [];
 
-  private activeSleepSource: AudioNode[] = [];
-  private activeSleepGain: GainNode | null = null;
-  private currentSleepType: string | null = null;
+  private activeSleepTracks: Map<
+    "rain" | "white" | "brown" | "binaural" | "ocean" | "forest",
+    { sources: AudioNode[]; gainNode: GainNode; volume: number }
+  > = new Map();
 
   constructor() {
     // Load mute state from localStorage
@@ -37,19 +38,27 @@ class SoundEngine {
     }
   }
 
-  public startSleepSound(type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest", volume: number = 0.5) {
+  public startSleepTrack(
+    type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest",
+    volume: number = 0.6
+  ) {
     this.init();
-    this.stopSleepSound();
     if (!this.ctx || !this.masterGain) return;
 
-    this.currentSleepType = type;
-    this.activeSleepGain = this.ctx.createGain();
-    this.activeSleepGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
-    this.activeSleepGain.gain.linearRampToValueAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime + 1.5);
-    this.activeSleepGain.connect(this.masterGain);
+    if (this.activeSleepTracks.has(type)) {
+      this.setSleepTrackVolume(type, volume);
+      return;
+    }
+
+    const trackGain = this.ctx.createGain();
+    trackGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+    trackGain.gain.linearRampToValueAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime + 1.0);
+    trackGain.connect(this.masterGain);
+
+    const sources: AudioNode[] = [];
 
     if (type === "white" || type === "brown" || type === "rain" || type === "ocean" || type === "forest") {
-      const bufferSize = 2 * this.ctx.sampleRate; // 2 seconds buffer
+      const bufferSize = 2 * this.ctx.sampleRate;
       const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
 
@@ -63,7 +72,7 @@ class SoundEngine {
           const white = Math.random() * 2 - 1;
           output[i] = (lastOut + 0.02 * white) / 1.02;
           lastOut = output[i];
-          output[i] *= 3.5; // boost volume
+          output[i] *= 3.5;
         }
       }
 
@@ -76,44 +85,40 @@ class SoundEngine {
         filter.type = "lowpass";
         filter.frequency.setValueAtTime(850, this.ctx.currentTime);
         noiseSource.connect(filter);
-        filter.connect(this.activeSleepGain);
+        filter.connect(trackGain);
       } else if (type === "ocean") {
-        // Modulated lowpass filter for wave effect
         const filter = this.ctx.createBiquadFilter();
         filter.type = "lowpass";
         filter.frequency.setValueAtTime(400, this.ctx.currentTime);
-        
-        // Create an LFO for waves
+
         const lfo = this.ctx.createOscillator();
         lfo.type = "sine";
-        lfo.frequency.value = 0.12; // ~8 second wave cycle
+        lfo.frequency.value = 0.12;
         const lfoGain = this.ctx.createGain();
-        lfoGain.gain.value = 350; // swing between 50Hz and 750Hz
+        lfoGain.gain.value = 350;
         lfo.connect(lfoGain);
         lfoGain.connect(filter.frequency);
 
         noiseSource.connect(filter);
-        filter.connect(this.activeSleepGain);
+        filter.connect(trackGain);
         lfo.start();
-        this.activeSleepSource.push(lfo);
+        sources.push(lfo);
       } else if (type === "forest") {
-        // Soft wind bandpass
         const filter = this.ctx.createBiquadFilter();
         filter.type = "bandpass";
         filter.frequency.setValueAtTime(1100, this.ctx.currentTime);
         filter.Q.value = 1.5;
         noiseSource.connect(filter);
-        filter.connect(this.activeSleepGain);
+        filter.connect(trackGain);
       } else {
-        noiseSource.connect(this.activeSleepGain);
+        noiseSource.connect(trackGain);
       }
 
       noiseSource.start();
-      this.activeSleepSource.push(noiseSource);
+      sources.push(noiseSource);
     } else if (type === "binaural") {
-      // 432 Hz fundamental theta wave binaural beat (Left: 216Hz, Right: 222Hz = 6Hz theta frequency)
       const merger = this.ctx.createChannelMerger(2);
-      
+
       const oscLeft = this.ctx.createOscillator();
       oscLeft.type = "sine";
       oscLeft.frequency.setValueAtTime(216, this.ctx.currentTime);
@@ -124,49 +129,96 @@ class SoundEngine {
       oscRight.frequency.setValueAtTime(222, this.ctx.currentTime);
       oscRight.connect(merger, 0, 1);
 
-      // Add a warm sub-drone at 108Hz
       const subOsc = this.ctx.createOscillator();
       subOsc.type = "sine";
       subOsc.frequency.setValueAtTime(108, this.ctx.currentTime);
       const subGain = this.ctx.createGain();
       subGain.gain.value = 0.3;
       subOsc.connect(subGain);
-      subGain.connect(this.activeSleepGain);
+      subGain.connect(trackGain);
 
-      merger.connect(this.activeSleepGain);
+      merger.connect(trackGain);
 
       oscLeft.start();
       oscRight.start();
       subOsc.start();
-      this.activeSleepSource.push(oscLeft, oscRight, subOsc);
+      sources.push(oscLeft, oscRight, subOsc);
     }
+
+    this.activeSleepTracks.set(type, { sources, gainNode: trackGain, volume });
+  }
+
+  public stopSleepTrack(type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest") {
+    const track = this.activeSleepTracks.get(type);
+    if (track && this.ctx) {
+      try {
+        track.gainNode.gain.setValueAtTime(track.gainNode.gain.value, this.ctx.currentTime);
+        track.gainNode.gain.linearRampToValueAtTime(0.0001, this.ctx.currentTime + 0.3);
+      } catch {}
+      setTimeout(() => {
+        track.sources.forEach((src) => {
+          try {
+            if ("stop" in src) (src as any).stop();
+            src.disconnect();
+          } catch {}
+        });
+        try {
+          track.gainNode.disconnect();
+        } catch {}
+      }, 350);
+      this.activeSleepTracks.delete(type);
+    }
+  }
+
+  public setSleepTrackVolume(
+    type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest",
+    volume: number
+  ) {
+    const track = this.activeSleepTracks.get(type);
+    if (track && this.ctx) {
+      track.volume = volume;
+      track.gainNode.gain.setTargetAtTime(
+        volume * (this.isMuted ? 0 : 0.6),
+        this.ctx.currentTime,
+        0.08
+      );
+    }
+  }
+
+  public isSleepTrackActive(
+    type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest"
+  ): boolean {
+    return this.activeSleepTracks.has(type);
+  }
+
+  public getActiveSleepTracks(): Array<"rain" | "white" | "brown" | "binaural" | "ocean" | "forest"> {
+    return Array.from(this.activeSleepTracks.keys());
+  }
+
+  public startSleepSound(
+    type: "rain" | "white" | "brown" | "binaural" | "ocean" | "forest",
+    volume: number = 0.5
+  ) {
+    this.stopSleepSound();
+    this.startSleepTrack(type, volume);
   }
 
   public setSleepVolume(volume: number) {
-    if (this.activeSleepGain && this.ctx) {
-      this.activeSleepGain.gain.setTargetAtTime(volume * (this.isMuted ? 0 : 0.6), this.ctx.currentTime, 0.1);
-    }
+    this.activeSleepTracks.forEach((track, type) => {
+      this.setSleepTrackVolume(type, volume);
+    });
   }
 
   public stopSleepSound() {
-    this.activeSleepSource.forEach((src) => {
-      try {
-        if ("stop" in src) (src as any).stop();
-        src.disconnect();
-      } catch {}
+    const activeTypes = Array.from(this.activeSleepTracks.keys());
+    activeTypes.forEach((type) => {
+      this.stopSleepTrack(type);
     });
-    this.activeSleepSource = [];
-    if (this.activeSleepGain) {
-      try {
-        this.activeSleepGain.disconnect();
-      } catch {}
-      this.activeSleepGain = null;
-    }
-    this.currentSleepType = null;
   }
 
   public getActiveSleepSound(): string | null {
-    return this.currentSleepType;
+    const active = this.getActiveSleepTracks();
+    return active.length > 0 ? active[0] : null;
   }
 
   public getMuteState(): boolean {

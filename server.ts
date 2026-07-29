@@ -239,6 +239,58 @@ app.get("/api/admin/revenue", async (req, res) => {
   }
 });
 
+// GET /api/reviews
+app.get("/api/reviews", async (req, res) => {
+  try {
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && data && data.length > 0) {
+        return res.json(data);
+      }
+    }
+
+    // Fallback sample reviews array
+    return res.json([
+      {
+        id: "rev_1",
+        author: "Sarah Jenkins",
+        rating: 5,
+        role: "Pro Member",
+        comment: "Neuraliso's multi-track ambient audio and CBT reframing completely changed my sleep and anxiety management routine.",
+        date: "2026-07-20"
+      },
+      {
+        id: "rev_2",
+        author: "Marcus Vance",
+        rating: 5,
+        role: "Daily User",
+        comment: "The 4-7-8 breathing guide and real-time AI companion feel so natural and grounding.",
+        date: "2026-07-22"
+      },
+      {
+        id: "rev_3",
+        author: "Elena Rostova",
+        rating: 5,
+        role: "Pro Member",
+        comment: "Layering rain with theta binaural beats helped me drift off in under 10 minutes every night.",
+        date: "2026-07-25"
+      }
+    ]);
+  } catch (err: any) {
+    console.error("Error in /api/reviews:", err);
+    res.status(500).json({ error: "Failed to fetch reviews" });
+  }
+});
+
+// Catch-all 404 for any unmatched /api/* endpoints (ensures JSON response instead of HTML SPA fallback)
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: "API endpoint not found" });
+});
+
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

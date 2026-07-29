@@ -23,6 +23,8 @@ import { PricingView } from "./components/subscription/PricingView";
 import { UpgradeModal } from "./components/subscription/UpgradeModal";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { useSubscription } from "./contexts/SubscriptionContext";
+import { AuthCallback } from "./components/auth/AuthCallback";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const AppLayout: React.FC = () => {
   const { showExpiryBanner, daysUntilExpiry, openUpgradeModal } = useSubscription();
@@ -57,33 +59,36 @@ export function App() {
         <CrisisModal />
         <UpgradeModal />
         
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/pricing" element={<PricingView />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
-          
-          <Route element={<ProtectedRoute />}>
-            <Route path="/app" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="mood" element={<MoodCheckView />} />
-              <Route path="breathe" element={<BreatheView />} />
-              <Route path="sleep" element={<SleepSoundsView />} />
-              <Route path="reframe" element={<ReframeView />} />
-              <Route path="progress" element={<ProgressView />} />
-              <Route path="settings" element={<SettingsView />} />
-              <Route path="chat" element={<ChatView />} />
-              <Route path="pricing" element={<PricingView />} />
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/pricing" element={<PricingView />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route path="/app" element={<AppLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="mood" element={<MoodCheckView />} />
+                <Route path="breathe" element={<BreatheView />} />
+                <Route path="sleep" element={<SleepSoundsView />} />
+                <Route path="reframe" element={<ReframeView />} />
+                <Route path="progress" element={<ProgressView />} />
+                <Route path="settings" element={<SettingsView />} />
+                <Route path="chat" element={<ChatView />} />
+                <Route path="pricing" element={<PricingView />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </div>
     </BrowserRouter>
   );

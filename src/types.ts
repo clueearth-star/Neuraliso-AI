@@ -68,8 +68,8 @@ export interface CrisisLog {
   message: string;
 }
 
-export type SubscriptionTier = "free" | "pro";
-export type SubscriptionStatus = "active" | "inactive" | "cancelled" | "trial";
+export type SubscriptionTier = "free" | "pro" | "plus";
+export type SubscriptionStatus = "active" | "inactive" | "cancelled" | "trial" | "trialing";
 export type BillingPeriod = "monthly" | "yearly";
 
 export interface UserSubscription {

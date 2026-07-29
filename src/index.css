@@ -164,6 +164,26 @@ input::placeholder, textarea::placeholder {
   animation: softPulse 4s ease-in-out infinite;
 }
 
+/* Glassmorphism fallbacks */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* Safari flex/height bug fixes */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.min-h-screen {
+  min-height: -webkit-fill-available;
+  min-height: 100vh;
+}
+
 /* Reduced motion accessibility */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

@@ -7,7 +7,7 @@ export const UpgradeModal: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<"yearly" | "monthly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [simulateMode, setSimulateMode] = useState(true); // Default true for smooth AI Studio testing
+  const [simulateMode, setSimulateMode] = useState(false); // Default false for Dodo checkout
 
   if (!isModalOpen) return null;
 

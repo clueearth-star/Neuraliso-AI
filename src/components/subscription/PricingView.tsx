@@ -8,7 +8,7 @@ export const PricingView: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<"yearly" | "monthly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [simulateMode, setSimulateMode] = useState(true);
+  const [simulateMode, setSimulateMode] = useState(false);
   const navigate = useNavigate();
 
   const handleUpgrade = async () => {

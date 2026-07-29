@@ -1,6 +1,35 @@
 import { MoodEntry, ReframeEntry, AppSettings, OnboardingState, ActivityLog, ChatMessage, CrisisLog, UserSubscription } from "../types";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
+let memoryStorage: Record<string, string> = {};
+function isStorageAvailable(): boolean {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return false;
+    window.localStorage.setItem('__test__', 'test');
+    window.localStorage.removeItem('__test__');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    if (isStorageAvailable()) return window.localStorage.getItem(key);
+    return memoryStorage[key] || null;
+  },
+  setItem: (key: string, value: string): void => {
+    if (isStorageAvailable()) window.localStorage.setItem(key, value);
+    else memoryStorage[key] = value;
+  },
+  removeItem: (key: string): void => {
+    if (isStorageAvailable()) window.localStorage.removeItem(key);
+    else delete memoryStorage[key];
+  }
+};
+
+const localStorage = safeStorage;
+
 const ONBOARDING_KEY = "neuraliso_onboarding_v2";
 const SETTINGS_KEY = "neuraliso_settings_v2";
 const MOODS_KEY = "neuraliso_moods_v2";
@@ -30,6 +59,16 @@ const DEFAULT_ONBOARDING: OnboardingState = {
 };
 
 export const storage = {
+  get(key: string): string | null {
+    return safeStorage.getItem(key);
+  },
+  set(key: string, value: string): void {
+    safeStorage.setItem(key, value);
+  },
+  remove(key: string): void {
+    safeStorage.removeItem(key);
+  },
+
   getSubscription(): UserSubscription {
     try {
       const data = localStorage.getItem(SUBSCRIPTION_KEY);

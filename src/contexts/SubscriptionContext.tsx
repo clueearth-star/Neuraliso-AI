@@ -3,6 +3,7 @@ import { UserSubscription, SubscriptionTier, SubscriptionStatus, BillingPeriod }
 import { storage } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { getDodoCheckoutUrl } from "../lib/subscriptions";
 
 export interface SubscriptionContextType {
   tier: SubscriptionTier;
@@ -92,14 +93,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   let showExpiryBanner = false;
   let daysUntilExpiry: number | null = null;
 
-  if (sub.tier === "pro") {
-    if (sub.status === "active" || sub.status === "trial" || sub.status === "cancelled") {
-      if (sub.expiresAt) {
-        const expiryDate = new Date(sub.expiresAt).getTime();
+  const currentTier = profile?.subscription_tier || sub.tier;
+  const currentStatus = profile?.subscription_status || sub.status;
+  const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
+
+  if (currentTier === "pro" || currentTier === "plus") {
+    if (currentStatus === "active" || currentStatus === "trial" || currentStatus === "trialing" || currentStatus === "cancelled") {
+      if (currentExpiry) {
+        const expiryDate = new Date(currentExpiry).getTime();
         const now = Date.now();
         if (expiryDate > now) {
           isPro = true;
-          if (sub.status === "trial") isTrial = true;
+          if (currentStatus === "trial" || currentStatus === "trialing") isTrial = true;
           
           const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
           if (diffDays <= 7 && diffDays >= 0) {
@@ -113,7 +118,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } else {
         // Active without expiry date set
         isPro = true;
-        if (sub.status === "trial") isTrial = true;
+        if (currentStatus === "trial" || currentStatus === "trialing") isTrial = true;
       }
     }
   }
@@ -156,11 +161,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: true };
       } else {
         // Open Dodo Payment Link
-        const link = plan === "monthly" 
-          ? (import.meta.env.VITE_DODO_PAYMENT_LINK_MONTHLY || "https://test.dodopayments.com/buy/p_test_monthly_plus")
-          : (import.meta.env.VITE_DODO_PAYMENT_LINK_YEARLY || "https://test.dodopayments.com/buy/p_test_yearly_plus");
-        
-        window.open(link, "_blank", "noopener,noreferrer");
+        console.log("Profile sub data:", profile);
+        console.log("Monthly link:", import.meta.env.VITE_DODO_MONTHLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_MONTHLY);
+        console.log("Yearly link:", import.meta.env.VITE_DODO_YEARLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_YEARLY);
+
+        const checkoutUrl = getDodoCheckoutUrl(plan, user);
+        if (checkoutUrl) {
+          console.log("Redirecting to Dodo Checkout URL:", checkoutUrl);
+          window.location.href = checkoutUrl;
+        } else {
+          const fallback = plan === "monthly" 
+            ? "https://test.dodopayments.com/buy/p_test_monthly_plus"
+            : "https://test.dodopayments.com/buy/p_test_yearly_plus";
+          window.location.href = fallback;
+        }
         return { success: true };
       }
     } catch (e: any) {

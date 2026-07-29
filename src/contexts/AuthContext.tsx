@@ -255,11 +255,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isSupabaseConfigured()) {
       return { error: { message: "Supabase credentials not configured in environment." }, data: null };
     }
-    const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/app` : "";
+    const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "";
     return await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
   }, []);

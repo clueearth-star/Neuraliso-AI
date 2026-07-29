@@ -171,8 +171,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           window.location.href = checkoutUrl;
         } else {
           const fallback = plan === "monthly" 
-            ? "https://test.dodopayments.com/buy/p_test_monthly_plus"
-            : "https://test.dodopayments.com/buy/p_test_yearly_plus";
+            ? "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app"
+            : "https://checkout.dodopayments.com/buy/pdt_0Nk8M2dIaqQpnEgOrwBKx?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
           window.location.href = fallback;
         }
         return { success: true };

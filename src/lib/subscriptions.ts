@@ -1,8 +1,8 @@
 import { supabase } from "./supabase";
 
 export const DODO_LINKS = {
-  monthly: import.meta.env.VITE_DODO_MONTHLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_MONTHLY || "https://test.dodopayments.com/buy/p_test_monthly_plus",
-  yearly: import.meta.env.VITE_DODO_YEARLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_YEARLY || "https://test.dodopayments.com/buy/p_test_yearly_plus",
+  monthly: import.meta.env.VITE_DODO_MONTHLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_MONTHLY || "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app",
+  yearly: import.meta.env.VITE_DODO_YEARLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_YEARLY || "https://checkout.dodopayments.com/buy/pdt_0Nk8M2dIaqQpnEgOrwBKx?quantity=1&redirect_url=https://neuraliso-ai.vercel.app",
 };
 
 export function getDodoCheckoutUrl(plan: "monthly" | "yearly", user?: { id?: string; email?: string } | null): string | null {

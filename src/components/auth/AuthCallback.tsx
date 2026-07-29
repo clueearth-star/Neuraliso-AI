@@ -8,53 +8,119 @@ export const AuthCallback: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
-      const url = new URL(window.location.href);
-      const params = url.searchParams;
-      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+    let mounted = true;
 
-      const error = params.get("error") || hashParams.get("error");
-      const errorDesc = params.get("error_description") || hashParams.get("error_description");
-
-      if (error) {
-        console.error("OAuth Error:", error, errorDesc);
-        setErrorMsg("Google sign-in didn't work. Try again or use email.");
-        return;
+    // Listen to onAuthStateChange for immediate redirection as soon as session is set
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && mounted) {
+        localStorage.setItem("neuraliso_is_anonymous", "false");
+        navigate("/app", { replace: true });
       }
+    });
 
-      const accessToken = hashParams.get("access_token") || params.get("access_token");
-      const refreshToken = hashParams.get("refresh_token") || params.get("refresh_token");
+    const handleCallback = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+        const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
 
-      if (accessToken && refreshToken) {
-        try {
-          const { error: sessionErr } = await supabase.auth.setSession({
+        const error = params.get("error") || hashParams.get("error");
+        const errorDesc = params.get("error_description") || hashParams.get("error_description");
+
+        if (error) {
+          console.error("OAuth Callback Error:", error, errorDesc);
+          if (mounted) {
+            setErrorMsg(errorDesc || "Google sign-in was canceled or encountered an error.");
+          }
+          return;
+        }
+
+        // 1. Explicit PKCE code exchange if code is in query params
+        const code = params.get("code");
+        if (code) {
+          console.log("[AuthCallback] Exchanging PKCE code for session...");
+          const { data: codeData, error: codeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (!codeErr && codeData?.session) {
+            console.log("[AuthCallback] PKCE code exchange successful!");
+            if (mounted) {
+              localStorage.setItem("neuraliso_is_anonymous", "false");
+              navigate("/app", { replace: true });
+            }
+            return;
+          } else if (codeErr) {
+            console.warn("[AuthCallback] PKCE exchangeCodeForSession notice:", codeErr.message);
+          }
+        }
+
+        // 2. Explicit access_token handling if in hash params
+        const accessToken = hashParams.get("access_token") || params.get("access_token");
+        const refreshToken = hashParams.get("refresh_token") || params.get("refresh_token");
+
+        if (accessToken && refreshToken) {
+          console.log("[AuthCallback] Setting session from tokens...");
+          const { data: tokenData, error: tokenErr } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          if (sessionErr) throw sessionErr;
+          if (!tokenErr && tokenData?.session) {
+            if (mounted) {
+              localStorage.setItem("neuraliso_is_anonymous", "false");
+              navigate("/app", { replace: true });
+            }
+            return;
+          }
+        }
+
+        // 3. Check existing session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          localStorage.setItem("neuraliso_is_anonymous", "false");
           navigate("/app", { replace: true });
           return;
-        } catch (err: any) {
-          console.error("Failed to set session:", err);
-          setErrorMsg("Failed to establish session after Google sign-in. Please try again.");
-          return;
+        }
+
+        // 4. Polling fallback loop for up to 8 seconds (16 x 500ms)
+        let attempts = 0;
+        const maxAttempts = 16;
+        const pollInterval = setInterval(async () => {
+          if (!mounted) {
+            clearInterval(pollInterval);
+            return;
+          }
+
+          attempts++;
+          const { data: { session: pollSession } } = await supabase.auth.getSession();
+          if (pollSession) {
+            clearInterval(pollInterval);
+            if (mounted) {
+              localStorage.setItem("neuraliso_is_anonymous", "false");
+              navigate("/app", { replace: true });
+            }
+            return;
+          }
+
+          if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            if (mounted) {
+              setErrorMsg("Google sign-in timed out. Please try signing in again.");
+            }
+          }
+        }, 500);
+
+      } catch (err: any) {
+        console.error("[AuthCallback] Unexpected error:", err);
+        if (mounted) {
+          setErrorMsg("An unexpected error occurred during Google sign-in.");
         }
       }
-
-      // Check if session already established by supabase auth auto-detector
-      const { data: { session }, error: getErr } = await supabase.auth.getSession();
-      if (session && !getErr) {
-        navigate("/app", { replace: true });
-        return;
-      }
-
-      // If we get here after 2 seconds and no session, show error
-      setTimeout(() => {
-        setErrorMsg("Google sign-in didn't work. Try again or use email.");
-      }, 2000);
     };
 
     handleCallback();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   if (errorMsg) {
@@ -69,7 +135,7 @@ export const AuthCallback: React.FC = () => {
           <div className="pt-2 flex gap-3 justify-center">
             <button
               onClick={() => navigate("/login", { replace: true })}
-              className="px-5 py-2.5 rounded-full bg-[#00d4ff] text-[#0B1121] font-bold text-sm flex items-center gap-2 mx-auto hover:opacity-90 transition-opacity"
+              className="px-5 py-2.5 rounded-full bg-[#00d4ff] text-[#0B1121] font-bold text-sm flex items-center gap-2 mx-auto hover:opacity-90 transition-opacity cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Try Again</span>
@@ -87,3 +153,4 @@ export const AuthCallback: React.FC = () => {
     </div>
   );
 };
+

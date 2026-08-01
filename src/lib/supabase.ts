@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { safeStorage } from "./storage";
 
 // Retrieve Supabase URL and Anon Key from environment variables
 const supabaseUrl = 
@@ -22,6 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: safeStorage,
     storageKey: "neuraliso_auth_token",
   },
 });

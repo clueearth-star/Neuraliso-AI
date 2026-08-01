@@ -4,6 +4,8 @@
  * Bypasses network asset loading entirely for instantaneous response.
  */
 
+import { safeStorage } from "./storage";
+
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -16,8 +18,8 @@ class SoundEngine {
   > = new Map();
 
   constructor() {
-    // Load mute state from localStorage
-    const savedMute = localStorage.getItem("neuraliso_sounds_muted");
+    // Load mute state safely
+    const savedMute = safeStorage.get("neuraliso_sounds_muted");
     this.isMuted = savedMute === "true";
   }
 
@@ -227,7 +229,7 @@ class SoundEngine {
 
   public setMuted(muted: boolean) {
     this.isMuted = muted;
-    localStorage.setItem("neuraliso_sounds_muted", muted ? "true" : "false");
+    safeStorage.set("neuraliso_sounds_muted", muted ? "true" : "false");
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.35, this.ctx.currentTime, 0.05);
     }

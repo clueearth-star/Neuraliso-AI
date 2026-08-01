@@ -25,6 +25,7 @@ import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { useSubscription } from "./contexts/SubscriptionContext";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 
 const AppLayout: React.FC = () => {
   const { showExpiryBanner, daysUntilExpiry, openUpgradeModal } = useSubscription();
@@ -52,12 +53,20 @@ const AppLayout: React.FC = () => {
 };
 
 export function App() {
+  React.useEffect(() => {
+    const splash = document.getElementById("splash");
+    if (splash) {
+      splash.remove();
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-[#0B1121] text-white selection:bg-[#00d4ff] selection:text-[#0B1121] font-sans">
         <AmbientOrbs />
         <CrisisModal />
         <UpgradeModal />
+        <PWAUpdatePrompt />
         
         <ErrorBoundary>
           <Routes>

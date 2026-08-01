@@ -19,6 +19,7 @@ import {
 import { CrisisBanner } from "./CrisisBanner";
 import { BrainLotusLogo } from "./BrainLotusLogo";
 import { sounds } from "../lib/sounds";
+import { storage } from "../lib/storage";
 import neuralisoLogo from "../assets/images/neuraliso_logo_1783904719183.jpg";
 
 export const LandingPage: React.FC = () => {
@@ -27,8 +28,8 @@ export const LandingPage: React.FC = () => {
 
   const handleStart = () => {
     sounds.playClick();
-    const onboarded = localStorage.getItem("neuraliso_onboarding_v2");
-    if (onboarded && JSON.parse(onboarded).completed) {
+    const onboarded = storage.getOnboarding();
+    if (onboarded && onboarded.completed) {
       navigate("/app");
     } else {
       navigate("/onboarding");

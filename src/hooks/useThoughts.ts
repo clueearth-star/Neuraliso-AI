@@ -17,7 +17,7 @@ export function useThoughts() {
     setError(null);
 
     // Priority 1: Try Supabase if authenticated & configured
-    if (user && isSupabaseConfigured() && !localStorage.getItem("neuraliso_is_anonymous")) {
+    if (user && isSupabaseConfigured() && !storage.get("neuraliso_is_anonymous")) {
       const { data: remoteData, error: remoteErr } = await supabaseRetry(async () => {
         return await supabase
           .from("thoughts")

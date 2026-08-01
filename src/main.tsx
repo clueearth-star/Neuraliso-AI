@@ -1,12 +1,12 @@
-import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import {AuthProvider} from './contexts/AuthContext';
 import {SubscriptionProvider} from './contexts/SubscriptionContext';
+import {ErrorBoundary} from './components/ErrorBoundary';
 import './index.css';
 
 // -------------------------------------------------------------
-// Global Resiliency Engine (Handles Adblockers & Server Sleep)
+// Global Resiliency Engine (Handles Mobile & Adblocker Errors)
 // -------------------------------------------------------------
 if (typeof window !== "undefined") {
   // Prevent third-party crashes (like ad-blocker blocked scripts) from bubbling up as unhandled rejections
@@ -42,12 +42,12 @@ if (typeof window !== "undefined") {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  <ErrorBoundary>
     <AuthProvider>
       <SubscriptionProvider>
         <App />
       </SubscriptionProvider>
     </AuthProvider>
-  </StrictMode>,
+  </ErrorBoundary>
 );
 

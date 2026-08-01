@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { safeStorage } from "../lib/storage";
 
 interface Position {
   x: number;
@@ -56,7 +57,7 @@ export function useDraggable({
   useEffect(() => {
     let initialPos: Position | null = null;
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = safeStorage.get(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed.x === "number" && typeof parsed.y === "number") {
@@ -145,7 +146,7 @@ export function useDraggable({
 
     if (currentPosRef.current) {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(currentPosRef.current));
+        safeStorage.set(storageKey, JSON.stringify(currentPosRef.current));
       } catch (e) {
         console.error("Failed to save dragged position:", e);
       }
@@ -213,7 +214,7 @@ export function useDraggable({
     currentPosRef.current = def;
     setPosition(def);
     try {
-      localStorage.removeItem(storageKey);
+      safeStorage.remove(storageKey);
     } catch (e) {
       console.error("Failed to remove storage key:", e);
     }

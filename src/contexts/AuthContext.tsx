@@ -45,18 +45,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if anonymous mode was previously activated or if local data already exists
   const [isAnonymous, setIsAnonymousState] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("neuraliso_is_anonymous");
+    const stored = storage.get("neuraliso_is_anonymous");
     if (stored !== null) return stored === "true";
     // If user has local data already, default to anonymous mode so they aren't locked out
-    const moods = localStorage.getItem("neuraliso_moods_v2");
-    const onboarding = localStorage.getItem("neuraliso_onboarding_v2");
+    const moods = storage.get("neuraliso_moods_v2");
+    const onboarding = storage.get("neuraliso_onboarding_v2");
     return Boolean(moods || onboarding);
   });
 
   const setAnonymousMode = useCallback((isAnon: boolean) => {
     setIsAnonymousState(isAnon);
     if (typeof window !== "undefined") {
-      localStorage.setItem("neuraliso_is_anonymous", isAnon ? "true" : "false");
+      storage.set("neuraliso_is_anonymous", isAnon ? "true" : "false");
     }
   }, []);
 
@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSyncMessage("Syncing your data...");
 
     try {
-      localStorage.setItem("neuraliso_auth_uid", currentUser.id);
+      storage.set("neuraliso_auth_uid", currentUser.id);
 
       // 1. Ensure profile exists or create default
       const { data: existingProfile, error: profileErr } = await supabase
@@ -175,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await handleUserLoginSync(newUser);
       } else {
         setProfile(null);
-        localStorage.removeItem("neuraliso_auth_uid");
+        storage.remove("neuraliso_auth_uid");
       }
       setLoading(false);
     });
@@ -274,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
-    localStorage.removeItem("neuraliso_auth_uid");
+    storage.remove("neuraliso_auth_uid");
     // Default back to anonymous mode after sign out so app stays functional
     setAnonymousMode(true);
   }, [setAnonymousMode]);

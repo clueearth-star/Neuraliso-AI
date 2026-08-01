@@ -8,7 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Neuraliso AI" />
     <link rel="manifest" href="/manifest.json" />
-    <script src="https://cdn.polyfill.io/v3/polyfill.min.js?features=default,es2015,es2016,es2017"></script>
     <title>Neuraliso AI - Serene Companion</title>
   </head>
   <body class="bg-[#0B1121] text-[#f8fafc] antialiased selection:bg-[#00d4ff]/30">
@@ -28,6 +27,7 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
+        transition: opacity 0.4s ease;
       ">
         <div style="width: 80px; height: 80px; margin-bottom: 24px;">
           <!-- Simple inline SVG brain logo -->
@@ -39,6 +39,18 @@
         <p style="color: rgba(255,255,255,0.5); font-family: system-ui;">Neuraliso</p>
       </div>
     </div>
+    <script>
+      // Fail-safe: ensure splash overlay is removed even if React takes time or hits an edge case
+      window.__removeSplash = function() {
+        const splash = document.getElementById('splash');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(() => { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
+        }
+      };
+      // Auto dismiss splash after 2.5s maximum as backup
+      setTimeout(window.__removeSplash, 2500);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {

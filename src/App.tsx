@@ -54,9 +54,11 @@ const AppLayout: React.FC = () => {
 
 export function App() {
   React.useEffect(() => {
-    const splash = document.getElementById("splash");
-    if (splash) {
-      splash.remove();
+    if (typeof window !== "undefined" && (window as any).__removeSplash) {
+      (window as any).__removeSplash();
+    } else {
+      const splash = document.getElementById("splash");
+      if (splash) splash.remove();
     }
   }, []);
 

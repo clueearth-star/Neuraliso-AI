@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import { Component, ErrorInfo, ReactNode } from "react";
 import { ErrorFallback } from "./ErrorFallback";
 
 interface Props {
@@ -12,12 +12,15 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public props!: Readonly<Props>;
-  public state!: Readonly<State>;
+  declare props: Readonly<Props>;
+  declare state: Readonly<State>;
 
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = {
+      hasError: false,
+      error: undefined,
+    };
   }
 
   public static getDerivedStateFromError(error: Error): State {
@@ -33,7 +36,12 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      return <ErrorFallback error={this.state.error} resetErrorBoundary={() => this.setState({ hasError: false, error: undefined })} />;
+      return (
+        <ErrorFallback
+          error={this.state.error}
+          resetErrorBoundary={() => (this as Component<Props, State>).setState({ hasError: false, error: undefined })}
+        />
+      );
     }
 
     return this.props.children;

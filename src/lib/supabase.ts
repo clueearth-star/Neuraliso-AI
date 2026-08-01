@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { safeStorage } from "./storage";
+import { safeStorage } from "./safeStorage";
 
 // Retrieve Supabase URL and Anon Key from environment variables
 const supabaseUrl = 

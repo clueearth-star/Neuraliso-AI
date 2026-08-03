@@ -1,4 +1,4 @@
-const CACHE_NAME = "neuraliso-pwa-v3";
+const CACHE_NAME = "neuraliso-pwa-v4";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -51,11 +51,36 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-First with fallback to cache
+  const isHTML = event.request.mode === "navigate" || 
+                (event.request.headers.get("accept") && event.request.headers.get("accept").includes("text/html"));
+
+  if (isHTML) {
+    // Always fetch fresh HTML from network first to prevent stale asset hashes
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          console.warn("[SW] Offline: falling back to cached index.html");
+          const cachedResponse = await caches.match(event.request) || await caches.match("/index.html") || await caches.match("/");
+          if (cachedResponse) return cachedResponse;
+          return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
+        })
+    );
+    return;
+  }
+
+  // Network-First with fallback to cache for static JS/CSS/Assets
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        // If network request succeeds with 200, update cache copy
         if (
           networkResponse &&
           networkResponse.status === 200 &&
@@ -75,18 +100,8 @@ self.addEventListener("fetch", (event) => {
           return cachedResponse;
         }
 
-        // For navigation requests when offline, return cached index.html
-        if (
-          event.request.mode === "navigate" ||
-          (event.request.headers.get("accept") && event.request.headers.get("accept").includes("text/html"))
-        ) {
-          const fallbackIndex = await caches.match("/index.html") || await caches.match("/");
-          if (fallbackIndex) return fallbackIndex;
-        }
-
-        return new Response("Network offline and resource not cached.", {
-          status: 503,
-          statusText: "Service Unavailable",
+        return new Response("Resource not found", {
+          status: 404,
           headers: { "Content-Type": "text/plain" }
         });
       })

@@ -100,16 +100,21 @@ CREATE INDEX IF NOT EXISTS idx_chat_user_created ON public.chat_history(user_id,
 ALTER PUBLICATION supabase_realtime ADD TABLE public.moods;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.thoughts;
 
--- 6. TRIGGER: AUTO-UPDATE UPDATED_AT ON PROFILES
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- 7. SUBSCRIPTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  dodo_subscription_id TEXT UNIQUE,
+  status TEXT NOT NULL DEFAULT 'inactive',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  current_period_end TIMESTAMPTZ
+);
 
-CREATE OR REPLACE TRIGGER set_profiles_updated_at
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can only access their own subscriptions"
+  ON public.subscriptions
+  FOR ALL
+  USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON public.subscriptions(user_id);

@@ -1,19 +1,60 @@
 import { createClient } from "@supabase/supabase-js";
 import { safeStorage } from "./safeStorage";
 
-// Retrieve Supabase URL and Anon Key from environment variables
-const supabaseUrl = 
-  import.meta.env.VITE_SUPABASE_URL || 
-  import.meta.env.SUPABASE_URL || 
-  "https://placeholder-project.supabase.co";
+function getValidSupabaseConfig() {
+  const targetRef = "siewuccllcisezwyiyaz";
+  const rawUrl = 
+    import.meta.env.VITE_SUPABASE_URL || 
+    import.meta.env.SUPABASE_URL || 
+    `https://${targetRef}.supabase.co`;
 
-const supabaseAnonKey = 
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  import.meta.env.SUPABASE_ANON_KEY || 
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
+  let url = `https://${targetRef}.supabase.co`;
+  try {
+    if (rawUrl && !rawUrl.includes("placeholder") && !rawUrl.includes("supabase.com/dashboard")) {
+      const parsed = new URL(rawUrl);
+      url = parsed.origin;
+    }
+  } catch (e) {
+    url = `https://${targetRef}.supabase.co`;
+  }
+
+  const candidates = [
+    import.meta.env.SUPABASE_ANON_KEY,
+    import.meta.env.VITE_SUPABASE_ANON_KEY,
+  ].filter(Boolean);
+
+  let selectedKey = candidates[0] || "";
+
+  for (const k of candidates) {
+    try {
+      const parts = k.split(".");
+      if (parts.length === 3) {
+        // Safe base64 decode for browser/node
+        const base64Str = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64Str)
+            .split('')
+            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        const payload = JSON.parse(jsonPayload);
+        if (payload.ref === targetRef) {
+          selectedKey = k;
+          break;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+  }
+
+  return { url, key: selectedKey };
+}
+
+const { url: supabaseUrl, key: supabaseAnonKey } = getValidSupabaseConfig();
 
 if (typeof window !== "undefined") {
-  console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL);
+  console.log('Supabase URL:', supabaseUrl);
   console.log('Redirect URL:', window.location.origin + '/auth/callback');
 }
 

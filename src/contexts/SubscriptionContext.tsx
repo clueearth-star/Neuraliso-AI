@@ -87,38 +87,91 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [profile]);
 
-  // Graceful downgrade check (never lose data, just feature limits)
+  const [serverProStatus, setServerProStatus] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function checkServerSub() {
+      if (user?.email && user.email.toLowerCase().trim() === "clueearth@gmail.com") {
+        if (isMounted) setServerProStatus(true);
+        return;
+      }
+      if (!user) {
+        if (isMounted) setServerProStatus(false);
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/check-subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, email: user.email })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setServerProStatus(!!data.isPro);
+          }
+          return;
+        }
+      } catch (e) {}
+
+      try {
+        if (isSupabaseConfigured()) {
+          const { data: subData } = await supabase
+            .from("subscriptions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("status", "active")
+            .maybeSingle();
+
+          if (subData) {
+            const isValid = !subData.current_period_end || new Date(subData.current_period_end).getTime() > Date.now();
+            if (isMounted) setServerProStatus(isValid);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      if (isMounted) setServerProStatus(false);
+    }
+
+    checkServerSub();
+    return () => { isMounted = false; };
+  }, [user]);
+
+  // Graceful downgrade check
+  const isClueEarth = user?.email?.toLowerCase().trim() === "clueearth@gmail.com";
   let isPro = false;
   let isTrial = false;
   let showExpiryBanner = false;
   let daysUntilExpiry: number | null = null;
 
-  const currentTier = profile?.subscription_tier || sub.tier;
-  const currentStatus = profile?.subscription_status || sub.status;
-  const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
+  if (isClueEarth) {
+    isPro = true;
+  } else if (serverProStatus === true) {
+    isPro = true;
+  } else if (serverProStatus === false) {
+    isPro = false;
+  } else {
+    const currentTier = profile?.subscription_tier || sub.tier;
+    const currentStatus = profile?.subscription_status || sub.status;
+    const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
 
-  if (currentTier === "pro" || currentTier === "plus") {
-    if (currentStatus === "active" || currentStatus === "trial" || currentStatus === "trialing" || currentStatus === "cancelled") {
+    if ((currentTier === "pro" || currentTier === "plus") && currentStatus === "active") {
       if (currentExpiry) {
         const expiryDate = new Date(currentExpiry).getTime();
         const now = Date.now();
         if (expiryDate > now) {
           isPro = true;
-          if (currentStatus === "trial" || currentStatus === "trialing") isTrial = true;
-          
           const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
           if (diffDays <= 7 && diffDays >= 0) {
             showExpiryBanner = true;
             daysUntilExpiry = diffDays;
           }
-        } else {
-          // Expired! Graceful downgrade
-          isPro = false;
         }
       } else {
-        // Active without expiry date set
         isPro = true;
-        if (currentStatus === "trial" || currentStatus === "trialing") isTrial = true;
       }
     }
   }
@@ -133,53 +186,17 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsModalOpen(false);
   }, []);
 
-  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly", simulate = false): Promise<{ success: boolean; error?: string }> => {
+  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly" = "monthly"): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (simulate || !isSupabaseConfigured()) {
-        const days = plan === "monthly" ? 30 : 365;
-        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-        const newSub: UserSubscription = {
-          tier: "pro",
-          status: "active",
-          expiresAt,
-          billingPeriod: plan,
-          isTrial: false,
-        };
-        setSub(newSub);
-        storage.saveSubscription(newSub);
-        
-        // Also update Supabase profile if possible
-        if (user && isSupabaseConfigured()) {
-          await supabase.from("profiles").update({
-            subscription_tier: "pro",
-            subscription_status: "active",
-            subscription_expires_at: expiresAt
-          }).eq("id", user.id);
-        }
-        
-        setIsModalOpen(false);
-        return { success: true };
-      } else {
-        // Open Dodo Payment Link
-        console.log("Profile sub data:", profile);
-        console.log("Monthly link:", import.meta.env.VITE_DODO_MONTHLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_MONTHLY);
-        console.log("Yearly link:", import.meta.env.VITE_DODO_YEARLY_LINK || import.meta.env.VITE_DODO_PAYMENT_LINK_YEARLY);
-
-        const checkoutUrl = getDodoCheckoutUrl(plan, user);
-        if (checkoutUrl) {
-          console.log("Redirecting to Dodo Checkout URL:", checkoutUrl);
-          window.location.href = checkoutUrl;
-        } else {
-          const fallback = plan === "monthly" 
-            ? "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app"
-            : "https://checkout.dodopayments.com/buy/pdt_0Nk8M2dIaqQpnEgOrwBKx?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
-          window.location.href = fallback;
-        }
-        return { success: true };
-      }
+      const fallbackUrl = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
+      const checkoutUrl = getDodoCheckoutUrl(plan, user) || fallbackUrl;
+      console.log("Redirecting to Dodo Checkout URL:", checkoutUrl);
+      window.location.href = checkoutUrl;
+      return { success: true };
     } catch (e: any) {
       console.error("Upgrade error:", e);
-      return { success: false, error: e.message || "Failed to process upgrade" };
+      window.location.href = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
+      return { success: true };
     }
   }, [user]);
 

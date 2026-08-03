@@ -4,11 +4,41 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
 function getSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
+  const targetRef = "siewuccllcisezwyiyaz";
+  const rawUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || `https://${targetRef}.supabase.co`;
+  let url = `https://${targetRef}.supabase.co`;
   try {
-    return createClient(url, key);
+    if (rawUrl && !rawUrl.includes("placeholder") && !rawUrl.includes("supabase.com/dashboard")) {
+      const parsed = new URL(rawUrl);
+      url = parsed.origin;
+    }
+  } catch (e) {
+    url = `https://${targetRef}.supabase.co`;
+  }
+
+  const candidates = [
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_ANON_KEY,
+    process.env.VITE_SUPABASE_ANON_KEY,
+  ].filter(Boolean) as string[];
+
+  let selectedKey = candidates[0] || "";
+  for (const k of candidates) {
+    try {
+      const parts = k.split(".");
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
+        if (payload.ref === targetRef) {
+          selectedKey = k;
+          break;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!url || !selectedKey) return null;
+  try {
+    return createClient(url, selectedKey);
   } catch (e) {
     return null;
   }
@@ -109,6 +139,55 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+// Helper function to check Pro status server-side from subscriptions table
+async function isUserProServerSide(userId?: string, email?: string): Promise<{ isPro: boolean; status: string; reason: string }> {
+  // 1. Permanent free access exception for clueearth@gmail.com
+  if (email && email.trim().toLowerCase() === "clueearth@gmail.com") {
+    return { isPro: true, status: "active", reason: "permanent_exception" };
+  }
+  if (!userId) {
+    return { isPro: false, status: "inactive", reason: "no_user_id" };
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return { isPro: false, status: "inactive", reason: "no_database" };
+  }
+
+  try {
+    // Read directly from subscriptions table server-side
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (sub) {
+      if (!sub.current_period_end) {
+        return { isPro: true, status: "active", reason: "active_subscription" };
+      }
+      if (new Date(sub.current_period_end).getTime() > Date.now()) {
+        return { isPro: true, status: "active", reason: "active_subscription" };
+      }
+    }
+
+    return { isPro: false, status: "inactive", reason: "no_active_subscription" };
+  } catch (e) {
+    return { isPro: false, status: "inactive", reason: "query_error" };
+  }
+}
+
+app.post("/api/check-subscription", async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+    const result = await isUserProServerSide(userId, email);
+    return res.json(result);
+  } catch (err) {
+    return res.json({ isPro: false, status: "inactive", reason: "error" });
+  }
+});
+
 // Dodo Payments Webhook Handler & Payment Verification
 app.post("/api/verify-payment", async (req, res) => {
   try {
@@ -116,15 +195,26 @@ app.post("/api/verify-payment", async (req, res) => {
     
     const days = plan === "monthly" ? 30 : 365;
     const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const dodoSubId = subscriptionId || `dodo_sub_${Date.now()}`;
     
     const supabase = getSupabaseAdmin();
     if (supabase && userId) {
+      // 1. Record in subscriptions table
+      await supabase.from("subscriptions").upsert({
+        user_id: userId,
+        dodo_subscription_id: dodoSubId,
+        status: status,
+        current_period_end: expiresAt,
+        created_at: new Date().toISOString()
+      }, { onConflict: "dodo_subscription_id" });
+
+      // 2. Update profiles table
       await supabase.from("profiles").update({
         subscription_tier: "pro",
         subscription_status: status,
         subscription_expires_at: expiresAt,
         dodo_customer_id: customerId || `dodo_cust_${Date.now()}`,
-        dodo_subscription_id: subscriptionId || `dodo_sub_${Date.now()}`,
+        dodo_subscription_id: dodoSubId,
       }).eq("id", userId);
     }
     
@@ -150,8 +240,8 @@ app.post("/api/dodo-webhook", async (req, res) => {
     const data = event?.data || event?.payload || event;
     
     const customerId = data?.customer_id || data?.customerId;
-    const subscriptionId = data?.subscription_id || data?.subscriptionId || data?.id;
-    const userId = data?.metadata?.user_id || data?.metadata?.userId || data?.user_id || data?.userId;
+    const subscriptionId = data?.subscription_id || data?.subscriptionId || data?.id || `dodo_sub_${Date.now()}`;
+    const userId = data?.metadata?.user_id || data?.metadata?.userId || data?.user_id || data?.userId || data?.client_reference_id;
     
     const supabase = getSupabaseAdmin();
     
@@ -159,6 +249,14 @@ app.post("/api/dodo-webhook", async (req, res) => {
       const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
       if (supabase) {
         if (userId) {
+          await supabase.from("subscriptions").upsert({
+            user_id: userId,
+            dodo_subscription_id: subscriptionId,
+            status: "active",
+            current_period_end: expiresAt,
+            created_at: new Date().toISOString()
+          }, { onConflict: "dodo_subscription_id" });
+
           await supabase.from("profiles").update({
             subscription_tier: "pro",
             subscription_status: "active",
@@ -174,22 +272,23 @@ app.post("/api/dodo-webhook", async (req, res) => {
           }).eq("dodo_customer_id", customerId);
         }
       }
-      console.log("[Dodo Webhook] Activated Pro subscription for user:", userId || customerId);
+      console.log("[Dodo Webhook] Activated Pro subscription in subscriptions table for user:", userId || customerId);
     } else if (type.includes("payment.failed")) {
-      console.log("[Dodo Webhook] Payment failed for customer:", customerId, "Keeping free tier, sending gentle notification.");
+      console.log("[Dodo Webhook] Payment failed for customer:", customerId);
     } else if (type.includes("subscription.cancelled") || type.includes("subscription.canceled")) {
       if (supabase) {
+        if (subscriptionId) {
+          await supabase.from("subscriptions").update({
+            status: "cancelled"
+          }).eq("dodo_subscription_id", subscriptionId);
+        }
         if (userId) {
           await supabase.from("profiles").update({
             subscription_status: "cancelled"
           }).eq("id", userId);
-        } else if (subscriptionId) {
-          await supabase.from("profiles").update({
-            subscription_status: "cancelled"
-          }).eq("dodo_subscription_id", subscriptionId);
         }
       }
-      console.log("[Dodo Webhook] Subscription marked as cancelled, pro features preserved until expiration.");
+      console.log("[Dodo Webhook] Subscription marked as cancelled.");
     }
     
     return res.status(200).json({ received: true });

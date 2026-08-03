@@ -15,13 +15,7 @@ export const UpgradeModal: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      if (selectedPlan === "yearly" && simulateMode) {
-        const res = await startFreeTrial();
-        if (!res.success) setError(res.error || "Failed to start trial");
-      } else {
-        const res = await upgradeToPro(selectedPlan, simulateMode);
-        if (!res.success) setError(res.error || "Failed to upgrade");
-      }
+      await upgradeToPro(selectedPlan);
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred");
     } finally {

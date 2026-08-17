@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import confetti from "canvas-confetti";
 import { UserSubscription, SubscriptionTier, SubscriptionStatus, BillingPeriod } from "../types";
 import { storage } from "../lib/storage";
 import { useAuth } from "./AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { getDodoCheckoutUrl } from "../lib/subscriptions";
+import { getDodoCheckoutUrl, hasProAccess, LIFETIME_DEAL } from "../lib/subscriptions";
 
 export interface SubscriptionContextType {
   tier: SubscriptionTier;
@@ -11,6 +12,7 @@ export interface SubscriptionContextType {
   expiresAt: string | null;
   billingPeriod?: BillingPeriod;
   isPro: boolean;
+  isLifetime: boolean;
   isTrial: boolean;
   moodsThisWeek: number;
   reframesThisWeek: number;
@@ -20,13 +22,20 @@ export interface SubscriptionContextType {
   isModalOpen: boolean;
   modalReason: string;
   modalFeature?: string;
+  isLifetimeModalOpen: boolean;
+  successToast: string | null;
   openUpgradeModal: (reason?: string, feature?: string) => void;
   closeUpgradeModal: () => void;
-  upgradeToPro: (plan: "monthly" | "yearly", simulate?: boolean) => Promise<{ success: boolean; error?: string }>;
+  openLifetimeModal: () => void;
+  closeLifetimeModal: () => void;
+  upgradeToPro: (plan: "monthly" | "yearly" | "lifetime", simulate?: boolean) => Promise<{ success: boolean; error?: string }>;
+  buyLifetimeDeal: (simulate?: boolean) => Promise<{ success: boolean; error?: string }>;
   startFreeTrial: () => Promise<{ success: boolean; error?: string }>;
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
   checkFeatureAccess: (feature: "mood" | "reframe" | "chat" | "breathe" | "sleep" | "progress", count?: number) => boolean;
   refreshUsageCounts: () => void;
+  triggerLifetimeCelebration: () => void;
+  dismissSuccessToast: () => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -38,6 +47,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState("");
   const [modalFeature, setModalFeature] = useState<string | undefined>(undefined);
+  const [isLifetimeModalOpen, setIsLifetimeModalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Usage counters
   const [moodsThisWeek, setMoodsThisWeek] = useState(0);
@@ -64,7 +75,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     refreshUsageCounts();
-    // Re-check counters periodically or on storage changes
     const interval = setInterval(refreshUsageCounts, 10000);
     return () => clearInterval(interval);
   }, [refreshUsageCounts]);
@@ -72,12 +82,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Sync subscription from profile/auth or local storage
   useEffect(() => {
     if (profile && profile.subscription_tier) {
+      const isLife = profile.subscription_tier === "lifetime";
       const updated: UserSubscription = {
         tier: (profile.subscription_tier as SubscriptionTier) || "free",
         status: (profile.subscription_status as SubscriptionStatus) || "inactive",
         expiresAt: profile.subscription_expires_at || null,
         dodoCustomerId: profile.dodo_customer_id,
         dodoSubscriptionId: profile.dodo_subscription_id,
+        isLifetime: isLife,
+        billingPeriod: isLife ? "lifetime" : undefined,
       };
       setSub(updated);
       storage.saveSubscription(updated);
@@ -88,16 +101,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [profile]);
 
   const [serverProStatus, setServerProStatus] = useState<boolean | null>(null);
+  const [serverIsLifetime, setServerIsLifetime] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
     async function checkServerSub() {
       if (user?.email && user.email.toLowerCase().trim() === "clueearth@gmail.com") {
-        if (isMounted) setServerProStatus(true);
+        if (isMounted) {
+          setServerProStatus(true);
+          setServerIsLifetime(true);
+        }
         return;
       }
       if (!user) {
-        if (isMounted) setServerProStatus(false);
+        if (isMounted) {
+          setServerProStatus(false);
+          setServerIsLifetime(false);
+        }
         return;
       }
 
@@ -111,6 +131,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const data = await res.json();
           if (isMounted) {
             setServerProStatus(!!data.isPro);
+            setServerIsLifetime(!!data.isLifetime);
           }
           return;
         }
@@ -126,39 +147,115 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             .maybeSingle();
 
           if (subData) {
-            const isValid = !subData.current_period_end || new Date(subData.current_period_end).getTime() > Date.now();
-            if (isMounted) setServerProStatus(isValid);
+            const isLife = !subData.current_period_end;
+            const isValid = isLife || new Date(subData.current_period_end).getTime() > Date.now();
+            if (isMounted) {
+              setServerProStatus(isValid);
+              setServerIsLifetime(isLife);
+            }
             return;
           }
         }
       } catch (e) {}
 
-      if (isMounted) setServerProStatus(false);
+      if (isMounted) {
+        setServerProStatus(false);
+        setServerIsLifetime(false);
+      }
     }
 
     checkServerSub();
     return () => { isMounted = false; };
   }, [user]);
 
+  // Trigger celebratory confetti
+  const triggerLifetimeCelebration = useCallback(() => {
+    try {
+      // Confetti burst (2-3 seconds)
+      const count = 200;
+      const defaults = {
+        origin: { y: 0.7 },
+        zIndex: 9999
+      };
+
+      const fire = (particleRatio: number, opts: confetti.Options) => {
+        confetti({
+          ...defaults,
+          ...opts,
+          particleCount: Math.floor(count * particleRatio)
+        });
+      };
+
+      fire(0.25, {
+        spread: 26,
+        startVelocity: 55,
+        colors: ["#FFD700", "#FFA500", "#FFFFFF"]
+      });
+      fire(0.2, {
+        spread: 60,
+        colors: ["#FFD700", "#00d4ff", "#00b8a9"]
+      });
+      fire(0.35, {
+        spread: 100,
+        decay: 0.91,
+        scalar: 0.8
+      });
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 25,
+        decay: 0.92,
+        scalar: 1.2
+      });
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 45,
+        colors: ["#FFD700", "#FFA500", "#10B981"]
+      });
+    } catch (e) {
+      console.log("Confetti effect unavailable:", e);
+    }
+
+    setSuccessToast("🎉 Welcome to Neuraliso Lifetime! You now have unlimited access forever.");
+  }, []);
+
+  // Check URL params for post-checkout redirection
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payment") === "success" || params.get("checkout") === "success" || params.get("lifetime") === "success") {
+        triggerLifetimeCelebration();
+        // Clean URL without refresh
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [triggerLifetimeCelebration]);
+
   // Graceful downgrade check
   const isClueEarth = user?.email?.toLowerCase().trim() === "clueearth@gmail.com";
   let isPro = false;
+  let isLifetime = false;
   let isTrial = false;
   let showExpiryBanner = false;
   let daysUntilExpiry: number | null = null;
 
+  const currentTier = profile?.subscription_tier || sub.tier;
+  const currentStatus = profile?.subscription_status || sub.status;
+  const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
+
   if (isClueEarth) {
     isPro = true;
+    isLifetime = true;
+  } else if (currentTier === "lifetime" || serverIsLifetime || sub.isLifetime) {
+    isPro = true;
+    isLifetime = true;
   } else if (serverProStatus === true) {
     isPro = true;
-  } else if (serverProStatus === false) {
+  } else if (serverProStatus === false && !sub.tier) {
     isPro = false;
   } else {
-    const currentTier = profile?.subscription_tier || sub.tier;
-    const currentStatus = profile?.subscription_status || sub.status;
-    const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
-
-    if ((currentTier === "pro" || currentTier === "plus") && currentStatus === "active") {
+    if (["pro", "plus", "plus_monthly", "plus_yearly"].includes(currentTier) && (currentStatus === "active" || currentStatus === "trial")) {
+      if (currentStatus === "trial") isTrial = true;
       if (currentExpiry) {
         const expiryDate = new Date(currentExpiry).getTime();
         const now = Date.now();
@@ -186,8 +283,86 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsModalOpen(false);
   }, []);
 
-  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly" = "monthly"): Promise<{ success: boolean; error?: string }> => {
+  const openLifetimeModal = useCallback(() => {
+    setIsLifetimeModalOpen(true);
+  }, []);
+
+  const closeLifetimeModal = useCallback(() => {
+    setIsLifetimeModalOpen(false);
+  }, []);
+
+  const dismissSuccessToast = useCallback(() => {
+    setSuccessToast(null);
+  }, []);
+
+  const buyLifetimeDeal = useCallback(async (simulate = false): Promise<{ success: boolean; error?: string }> => {
     try {
+      if (simulate) {
+        const updated: UserSubscription = {
+          tier: "lifetime",
+          status: "active",
+          expiresAt: null,
+          billingPeriod: "lifetime",
+          isLifetime: true,
+        };
+        setSub(updated);
+        storage.saveSubscription(updated);
+
+        if (user && isSupabaseConfigured()) {
+          await supabase.from("profiles").update({
+            subscription_tier: "lifetime",
+            subscription_status: "active",
+            subscription_expires_at: null
+          }).eq("id", user.id);
+        }
+
+        setIsLifetimeModalOpen(false);
+        setIsModalOpen(false);
+        triggerLifetimeCelebration();
+        return { success: true };
+      }
+
+      const checkoutUrl = getDodoCheckoutUrl("lifetime", user);
+      console.log("Redirecting to Dodo Lifetime Checkout URL:", checkoutUrl);
+      window.location.href = checkoutUrl;
+      return { success: true };
+    } catch (e: any) {
+      console.error("Lifetime purchase error:", e);
+      window.location.href = LIFETIME_DEAL.link;
+      return { success: true };
+    }
+  }, [user, triggerLifetimeCelebration]);
+
+  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly" | "lifetime" = "monthly", simulate = false): Promise<{ success: boolean; error?: string }> => {
+    if (plan === "lifetime") {
+      return buyLifetimeDeal(simulate);
+    }
+    try {
+      if (simulate) {
+        const days = plan === "monthly" ? 30 : 365;
+        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+        const newSub: UserSubscription = {
+          tier: "pro",
+          status: "active",
+          expiresAt,
+          billingPeriod: plan,
+          isTrial: false,
+        };
+        setSub(newSub);
+        storage.saveSubscription(newSub);
+
+        if (user && isSupabaseConfigured()) {
+          await supabase.from("profiles").update({
+            subscription_tier: "pro",
+            subscription_status: "active",
+            subscription_expires_at: expiresAt
+          }).eq("id", user.id);
+        }
+
+        setIsModalOpen(false);
+        return { success: true };
+      }
+
       const fallbackUrl = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
       const checkoutUrl = getDodoCheckoutUrl(plan, user) || fallbackUrl;
       console.log("Redirecting to Dodo Checkout URL:", checkoutUrl);
@@ -198,7 +373,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       window.location.href = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
       return { success: true };
     }
-  }, [user]);
+  }, [user, buyLifetimeDeal]);
 
   const startFreeTrial = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -251,7 +426,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [sub, user]);
 
   const checkFeatureAccess = useCallback((feature: "mood" | "reframe" | "chat" | "breathe" | "sleep" | "progress", count?: number): boolean => {
-    if (isPro) return true;
+    if (isPro || isLifetime) return true;
 
     // Ethical non-negotiables & free tiers
     switch (feature) {
@@ -264,11 +439,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       case "breathe":
       case "sleep":
       case "progress":
-        return false; // Specific enhanced items check individually
+        return false;
       default:
         return true;
     }
-  }, [isPro, moodsThisWeek, reframesThisWeek, chatToday]);
+  }, [isPro, isLifetime, moodsThisWeek, reframesThisWeek, chatToday]);
 
   return (
     <SubscriptionContext.Provider
@@ -278,6 +453,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         expiresAt: sub.expiresAt,
         billingPeriod: sub.billingPeriod,
         isPro,
+        isLifetime,
         isTrial,
         moodsThisWeek,
         reframesThisWeek,
@@ -287,13 +463,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isModalOpen,
         modalReason,
         modalFeature,
+        isLifetimeModalOpen,
+        successToast,
         openUpgradeModal,
         closeUpgradeModal,
+        openLifetimeModal,
+        closeLifetimeModal,
         upgradeToPro,
+        buyLifetimeDeal,
         startFreeTrial,
         cancelSubscription,
         checkFeatureAccess,
         refreshUsageCounts,
+        triggerLifetimeCelebration,
+        dismissSuccessToast,
       }}
     >
       {children}

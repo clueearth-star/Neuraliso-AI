@@ -13,6 +13,7 @@ import { ReframeView } from "./components/ReframeView";
 import { ProgressView } from "./components/ProgressView";
 import { SettingsView } from "./components/SettingsView";
 import { ChatView } from "./components/ChatView";
+import { InsightsView } from "./components/InsightsView";
 import { FloatingChatButton } from "./components/FloatingChatButton";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./components/auth/Login";
@@ -21,6 +22,8 @@ import { ForgotPassword } from "./components/auth/ForgotPassword";
 import { ResetPassword } from "./components/auth/ResetPassword";
 import { PricingView } from "./components/subscription/PricingView";
 import { UpgradeModal } from "./components/subscription/UpgradeModal";
+import { LifetimeDealBanner } from "./components/subscription/LifetimeDealBanner";
+import { LifetimeCheckoutModal } from "./components/subscription/LifetimeCheckoutModal";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { useSubscription } from "./contexts/SubscriptionContext";
 import { AuthCallback } from "./components/auth/AuthCallback";
@@ -64,7 +67,9 @@ export function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[#0B1121] text-white selection:bg-[#00d4ff] selection:text-[#0B1121] font-sans">
+      <div className="min-h-screen bg-[#0B1121] text-white selection:bg-[#00d4ff] selection:text-[#0B1121] font-sans flex flex-col">
+        <LifetimeDealBanner />
+        <LifetimeCheckoutModal />
         <AmbientOrbs />
         <CrisisModal />
         <UpgradeModal />
@@ -87,6 +92,7 @@ export function App() {
               <Route path="/app" element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="mood" element={<MoodCheckView />} />
+                <Route path="insights" element={<InsightsView />} />
                 <Route path="breathe" element={<BreatheView />} />
                 <Route path="sleep" element={<SleepSoundsView />} />
                 <Route path="reframe" element={<ReframeView />} />

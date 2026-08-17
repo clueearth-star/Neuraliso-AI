@@ -30,11 +30,23 @@ import { sounds } from "../lib/sounds";
 import { AppSettings } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useSubscription } from "../contexts/SubscriptionContext";
+import { Crown } from "lucide-react";
 
 export const SettingsView: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile, updateProfileName, signOut, syncStatus, syncMessage, isAnonymous } = useAuth();
-  const { isPro, isTrial, status, tier, expiresAt, billingPeriod, cancelSubscription, upgradeToPro, openUpgradeModal } = useSubscription();
+  const { 
+    isPro, 
+    isLifetime, 
+    isTrial, 
+    status, 
+    tier, 
+    expiresAt, 
+    billingPeriod, 
+    cancelSubscription, 
+    upgradeToPro, 
+    openUpgradeModal 
+  } = useSubscription();
   
   const [settings, setSettings] = useState<AppSettings>(storage.getSettings());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -256,8 +268,8 @@ export const SettingsView: React.FC = () => {
               <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                 isPro ? "bg-[#FFD700]/20 text-[#FFD700] border border-[#FFD700]/30" : "bg-white/10 text-white/70"
               }`}>
-                {isPro && <Sparkles className="w-3.5 h-3.5" />}
-                <span>{isPro ? (isTrial ? "Plus (Free Trial)" : status === "cancelled" ? "Plus (Cancelled)" : "Plus Member") : "Free Plan"}</span>
+                {isPro && (isLifetime ? <Crown className="w-3.5 h-3.5 fill-current" /> : <Sparkles className="w-3.5 h-3.5" />)}
+                <span>{isLifetime ? "Plus Lifetime Member" : isPro ? (isTrial ? "Plus (Free Trial)" : status === "cancelled" ? "Plus (Cancelled)" : "Plus Member") : "Free Plan"}</span>
               </span>
             </div>
           </div>
@@ -268,9 +280,21 @@ export const SettingsView: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-white">Neuraliso Plus {billingPeriod ? `(${billingPeriod})` : ""}</h3>
+                      <h3 className="text-base font-bold text-white">
+                        {isLifetime ? "Neuraliso Plus Lifetime" : `Neuraliso Plus ${billingPeriod ? `(${billingPeriod})` : ""}`}
+                      </h3>
+                      {isLifetime && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] border border-emerald-500/30">
+                          Permanent Access
+                        </span>
+                      )}
                     </div>
-                    {status === "cancelled" ? (
+                    {isLifetime ? (
+                      <p className="text-xs text-amber-200/90 flex items-center gap-1.5 font-medium">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
+                        <span>One-time purchase active forever. No recurring fees or renewals ever.</span>
+                      </p>
+                    ) : status === "cancelled" ? (
                       <p className="text-xs text-amber-300 font-medium flex items-center gap-1.5">
                         <AlertCircle className="w-4 h-4 shrink-0" />
                         <span>
@@ -299,29 +323,31 @@ export const SettingsView: React.FC = () => {
                       <span>Manage in Dodo Portal</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
-                    {status !== "cancelled" ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sounds.playClick();
-                          setShowCancelSurvey(true);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs transition-all cursor-pointer"
-                      >
-                        Cancel Plan
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          sounds.playClick();
-                          await upgradeToPro(billingPeriod || "monthly", true);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#0B1121] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Resume Subscription</span>
-                      </button>
+                    {!isLifetime && (
+                      status !== "cancelled" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setShowCancelSurvey(true);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold text-xs transition-all cursor-pointer"
+                        >
+                          Cancel Plan
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            sounds.playClick();
+                            await upgradeToPro(billingPeriod || "monthly", true);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#0B1121] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Resume Subscription</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

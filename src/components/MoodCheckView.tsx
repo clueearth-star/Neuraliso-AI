@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Smile, Check, Tag, Clock, TrendingUp, Sparkles, Trash2, Bot, MessageCircle } from "lucide-react";
+import { Smile, Check, Tag, Clock, TrendingUp, Sparkles, Trash2, Bot, MessageCircle, ShieldCheck, Brain, Plus } from "lucide-react";
+import { analyzeSentiment } from "../lib/sentiment";
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -157,6 +158,54 @@ export const MoodCheckView: React.FC = () => {
                 rows={3}
                 className="w-full text-sm leading-relaxed"
               />
+
+              {/* Local Browser Sentiment Analysis Box */}
+              {note.trim().length > 3 && (() => {
+                const sentimentRes = analyzeSentiment(note);
+                return (
+                  <div className="p-4 rounded-2xl bg-[#111A2E]/90 border border-[#00d4ff]/30 space-y-3 animate-fadeIn">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-[#00d4ff] font-bold">
+                        <Brain className="w-4 h-4" />
+                        <span>Local Browser Sentiment Engine</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
+                        100% Private (0kb network)
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-white/80 space-y-2">
+                      <p className="font-semibold text-white/90">{sentimentRes.summary}</p>
+                      
+                      {sentimentRes.suggestedTags.length > 0 && (
+                        <div className="space-y-1.5 pt-1 border-t border-white/10">
+                          <p className="text-[11px] text-white/50 font-medium">⚡ Auto-Suggested Tags (Tap to add):</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {sentimentRes.suggestedTags.map((suggestedTag) => {
+                              const isAlreadySelected = selectedTags.includes(suggestedTag);
+                              return (
+                                <button
+                                  type="button"
+                                  key={suggestedTag}
+                                  onClick={() => toggleTag(suggestedTag)}
+                                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                    isAlreadySelected
+                                      ? "bg-[#00d4ff] text-[#0B1121]"
+                                      : "bg-amber-500/20 border border-amber-400/40 text-amber-300 hover:bg-amber-500/30"
+                                  }`}
+                                >
+                                  {isAlreadySelected ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                                  <span>{suggestedTag}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 3. Tag Selector */}

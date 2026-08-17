@@ -245,14 +245,92 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* 5. Progress */}
-            <div className="wellness-card p-8 space-y-4 text-left group md:col-span-2 lg:col-span-1">
+            <div className="wellness-card p-8 space-y-4 text-left group">
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
                 <TrendingUp className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold text-white">Progress Tracking</h3>
+              <h3 className="text-xl font-bold text-white">Progress &amp; Insights</h3>
               <p className="text-sm text-white/60 leading-relaxed">
-                Visualize your mood history over time with interactive charts, mood distribution summaries, tag frequency, and easy JSON data export.
+                Visualize your mood history with interactive charts, local pattern recognition, and trend insights surfaced directly in your browser.
               </p>
+            </div>
+
+            {/* 6. CBT AI Coach */}
+            <div className="wellness-card p-8 space-y-4 text-left group">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-white">CBT AI Companion</h3>
+              <p className="text-sm text-white/60 leading-relaxed">
+                24/7 empathetic conversational coach powered by Google Gemini 3.6 Flash under a strict zero data retention policy.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* AI Transparency & Privacy Matrix Section */}
+      <section className="py-20 px-4 bg-[#0D1424] border-t border-[#00d4ff]/20">
+        <div className="max-w-6xl mx-auto space-y-12">
+          <div className="text-center space-y-4 max-w-3xl mx-auto">
+            <span className="text-xs font-mono font-bold tracking-widest uppercase text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              AI Transparency &amp; Data Policy
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Exactly how AI works in Neuraliso
+            </h2>
+            <p className="text-sm sm:text-base text-white/70">
+              We believe in complete privacy and clarity. Here is where every AI feature runs and what data it touches.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+            {/* 1. Local Sentiment Tagging */}
+            <div className="wellness-card p-7 space-y-4 border border-emerald-500/30 bg-emerald-950/10">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] font-mono uppercase">
+                  100% On-Device
+                </span>
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Local Sentiment Tagging</h3>
+              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
+                <li>• <strong>What it does:</strong> Analyzes journal reflection text to auto-suggest emotional tags (e.g. Anxious, Stressed, Calming).</li>
+                <li>• <strong>Where it runs:</strong> 100% inside your browser memory (0 network requests).</li>
+                <li>• <strong>Data touched:</strong> Journal text stays strictly on your local device.</li>
+              </ul>
+            </div>
+
+            {/* 2. Trend & Pattern Insights */}
+            <div className="wellness-card p-7 space-y-4 border border-[#00d4ff]/30 bg-[#00d4ff]/5">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-1 rounded-full bg-[#00d4ff]/20 text-[#00d4ff] font-bold text-[10px] font-mono uppercase">
+                  100% On-Device
+                </span>
+                <ShieldCheck className="w-5 h-5 text-[#00d4ff]" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Pattern Recognition</h3>
+              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
+                <li>• <strong>What it does:</strong> Surfaces evening anxiety trends and suggests targeted breathing or sleep sound exercises.</li>
+                <li>• <strong>Where it runs:</strong> Local JavaScript pattern engine in your browser.</li>
+                <li>• <strong>Data touched:</strong> Local mood history timestamps &amp; tags.</li>
+              </ul>
+            </div>
+
+            {/* 3. Optional CBT AI Companion */}
+            <div className="wellness-card p-7 space-y-4 border border-purple-500/30 bg-purple-950/10">
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[10px] font-mono uppercase">
+                  Stateless Cloud Proxy
+                </span>
+                <Lock className="w-5 h-5 text-purple-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white">CBT AI Companion</h3>
+              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
+                <li>• <strong>What it does:</strong> Provides 24/7 conversational CBT coaching &amp; thought reframing.</li>
+                <li>• <strong>Provider &amp; Model:</strong> Google Gemini 3.6 Flash via serverless proxy.</li>
+                <li>• <strong>Data Retention Policy:</strong> <strong>Zero Data Retention</strong>. Chat prompts are processed statelessly in volatile memory and immediately discarded.</li>
+              </ul>
             </div>
           </div>
         </div>

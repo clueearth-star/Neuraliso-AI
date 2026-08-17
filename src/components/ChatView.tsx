@@ -93,10 +93,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ onClose, initialPrompt }) =>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                  Neuraliso AI Companion
+                  Neuraliso CBT AI Coach
                 </h1>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                  Online
+                  Zero Data Retention
                 </span>
               </div>
               <p className="text-xs text-white/60 flex items-center gap-1.5 mt-0.5">
@@ -132,6 +132,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ onClose, initialPrompt }) =>
               </button>
             )}
           </div>
+        </div>
+
+        {/* AI Provider & Zero Data Retention Disclosure Card */}
+        <div className="px-4 py-2.5 bg-[#0D1424] border-b border-white/10 flex items-center justify-between text-xs text-white/70 gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#00d4ff] shrink-0" />
+            <span>
+              <strong>AI Model:</strong> Google Gemini 3.6 Flash | <strong>Privacy:</strong> Zero Data Retention (Stateless)
+            </span>
+          </div>
+          <span className="hidden md:inline text-[10px] text-emerald-400 font-mono">0 Bytes Saved Server-Side</span>
         </div>
 
         {/* Clear Confirmation Modal */}

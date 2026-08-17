@@ -3,7 +3,15 @@ import { X, Moon, Wind, Bot, Sparkles, CheckCircle2, ShieldCheck, Zap } from "lu
 import { useSubscription } from "../../contexts/SubscriptionContext";
 
 export const UpgradeModal: React.FC = () => {
-  const { isModalOpen, modalReason, modalFeature, closeUpgradeModal, upgradeToPro, startFreeTrial } = useSubscription();
+  const { 
+    isModalOpen, 
+    modalReason, 
+    modalFeature, 
+    closeUpgradeModal, 
+    openLifetimeModal, 
+    upgradeToPro, 
+    startFreeTrial 
+  } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<"yearly" | "monthly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +97,7 @@ export const UpgradeModal: React.FC = () => {
         </div>
 
         {/* Pricing Selection */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           {/* Yearly Plan Card */}
           <div
             onClick={() => setSelectedPlan("yearly")}
@@ -125,6 +133,31 @@ export const UpgradeModal: React.FC = () => {
             </div>
             <div className="text-[11px] text-slate-400 mt-2">Billed monthly</div>
           </div>
+        </div>
+
+        {/* Featured Lifetime Deal Strip */}
+        <div 
+          onClick={() => {
+            closeUpgradeModal();
+            openLifetimeModal();
+          }}
+          className="mb-5 p-3 rounded-2xl bg-gradient-to-r from-[#FFD700]/20 via-[#FFA500]/25 to-[#FFD700]/20 border border-[#FFD700]/50 flex items-center justify-between gap-3 cursor-pointer hover:border-[#FFD700] transition-all group shadow-md"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-lg bg-[#FFD700] text-[#0B1121]">
+              <Sparkles className="w-4 h-4 fill-current" />
+            </span>
+            <div className="text-left">
+              <div className="text-xs font-black text-white flex items-center gap-1">
+                <span>🔥 Lifetime Deal: $20.92 One-Time</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500 text-[#0B1121] font-bold">SAVE 65%</span>
+              </div>
+              <div className="text-[11px] text-slate-300">Pay once, own Neuraliso Plus forever. Never renew.</div>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-[#FFD700] group-hover:translate-x-0.5 transition-transform shrink-0">
+            View Deal →
+          </span>
         </div>
 
         {/* Error Display */}

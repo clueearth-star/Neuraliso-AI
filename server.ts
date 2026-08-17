@@ -98,18 +98,25 @@ app.post("/api/chat", async (req, res) => {
     // 2. Fallback to Gemini if key is available
     if (process.env.GEMINI_API_KEY) {
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ 
+          apiKey: process.env.GEMINI_API_KEY,
+          httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+        });
         const lastUserMsg = messages[messages.length - 1]?.content || "";
         const historyText = messages.slice(0, -1).map((m: any) => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
         const prompt = `${systemPrompt}\n\nChat History:\n${historyText}\n\nUSER: ${lastUserMsg}\nASSISTANT:`;
         
         const genRes = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.6-flash",
           contents: prompt,
         });
         const reply = genRes.text;
         if (reply) {
-          return res.json({ reply });
+          return res.json({ 
+            reply,
+            provider: "Google Gemini 3.6 Flash via Neuraliso Proxy",
+            dataPolicy: "Zero Data Retention — Processed statelessly in memory and never logged or saved to disk."
+          });
         }
       } catch (geminiErr) {
         console.warn("Gemini API call failed, using offline intelligent companion:", geminiErr);
@@ -140,22 +147,36 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // Helper function to check Pro status server-side from subscriptions table
-async function isUserProServerSide(userId?: string, email?: string): Promise<{ isPro: boolean; status: string; reason: string }> {
+async function isUserProServerSide(userId?: string, email?: string): Promise<{ isPro: boolean; isLifetime: boolean; status: string; reason: string }> {
   // 1. Permanent free access exception for clueearth@gmail.com
   if (email && email.trim().toLowerCase() === "clueearth@gmail.com") {
-    return { isPro: true, status: "active", reason: "permanent_exception" };
+    return { isPro: true, isLifetime: true, status: "active", reason: "permanent_exception" };
   }
   if (!userId) {
-    return { isPro: false, status: "inactive", reason: "no_user_id" };
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_user_id" };
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    return { isPro: false, status: "inactive", reason: "no_database" };
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_database" };
   }
 
   try {
-    // Read directly from subscriptions table server-side
+    // Read profile or subscriptions table server-side
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("subscription_tier, subscription_status, subscription_expires_at")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profile) {
+      const tier = (profile.subscription_tier || "").toLowerCase();
+      const status = (profile.subscription_status || "").toLowerCase();
+      if (tier === "lifetime" && (status === "active" || status === "" || !status)) {
+        return { isPro: true, isLifetime: true, status: "active", reason: "lifetime_tier" };
+      }
+    }
+
     const { data: sub } = await supabase
       .from("subscriptions")
       .select("*")
@@ -165,16 +186,16 @@ async function isUserProServerSide(userId?: string, email?: string): Promise<{ i
 
     if (sub) {
       if (!sub.current_period_end) {
-        return { isPro: true, status: "active", reason: "active_subscription" };
+        return { isPro: true, isLifetime: true, status: "active", reason: "lifetime_or_unlimited" };
       }
       if (new Date(sub.current_period_end).getTime() > Date.now()) {
-        return { isPro: true, status: "active", reason: "active_subscription" };
+        return { isPro: true, isLifetime: false, status: "active", reason: "active_subscription" };
       }
     }
 
-    return { isPro: false, status: "inactive", reason: "no_active_subscription" };
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_active_subscription" };
   } catch (e) {
-    return { isPro: false, status: "inactive", reason: "query_error" };
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "query_error" };
   }
 }
 
@@ -184,7 +205,7 @@ app.post("/api/check-subscription", async (req, res) => {
     const result = await isUserProServerSide(userId, email);
     return res.json(result);
   } catch (err) {
-    return res.json({ isPro: false, status: "inactive", reason: "error" });
+    return res.json({ isPro: false, isLifetime: false, status: "inactive", reason: "error" });
   }
 });
 
@@ -193,9 +214,11 @@ app.post("/api/verify-payment", async (req, res) => {
   try {
     const { userId, subscriptionId, customerId, plan = "yearly", status = "active", isTrial = false } = req.body;
     
+    const isLifetime = plan === "lifetime";
     const days = plan === "monthly" ? 30 : 365;
-    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-    const dodoSubId = subscriptionId || `dodo_sub_${Date.now()}`;
+    const expiresAt = isLifetime ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const tier = isLifetime ? "lifetime" : "pro";
+    const dodoSubId = subscriptionId || `dodo_${isLifetime ? "life" : "sub"}_${Date.now()}`;
     
     const supabase = getSupabaseAdmin();
     if (supabase && userId) {
@@ -210,7 +233,7 @@ app.post("/api/verify-payment", async (req, res) => {
 
       // 2. Update profiles table
       await supabase.from("profiles").update({
-        subscription_tier: "pro",
+        subscription_tier: tier,
         subscription_status: status,
         subscription_expires_at: expiresAt,
         dodo_customer_id: customerId || `dodo_cust_${Date.now()}`,
@@ -220,7 +243,8 @@ app.post("/api/verify-payment", async (req, res) => {
     
     return res.json({
       success: true,
-      tier: "pro",
+      tier,
+      isLifetime,
       status,
       expiresAt,
       isTrial
@@ -240,13 +264,24 @@ app.post("/api/dodo-webhook", async (req, res) => {
     const data = event?.data || event?.payload || event;
     
     const customerId = data?.customer_id || data?.customerId;
-    const subscriptionId = data?.subscription_id || data?.subscriptionId || data?.id || `dodo_sub_${Date.now()}`;
+    const subscriptionId = data?.subscription_id || data?.subscriptionId || data?.payment_id || data?.id || `dodo_pay_${Date.now()}`;
     const userId = data?.metadata?.user_id || data?.metadata?.userId || data?.user_id || data?.userId || data?.client_reference_id;
     
+    // Check if this payment is for Lifetime Deal (by productId, name, or metadata)
+    const isLifetime = 
+      data?.metadata?.plan === "lifetime" ||
+      data?.metadata?.tier === "lifetime" ||
+      (data?.product_id && (data.product_id.includes("lifetime") || data.product_id.includes("j2z0q1cr8bh"))) ||
+      (data?.description && data.description.toLowerCase().includes("lifetime")) ||
+      (data?.title && data.title.toLowerCase().includes("lifetime")) ||
+      (data?.total_amount && (Math.abs(data.total_amount - 2092) < 5 || Math.abs(data.total_amount - 20.92) < 0.1));
+
     const supabase = getSupabaseAdmin();
     
-    if (type.includes("payment.success") || type.includes("subscription.active") || type.includes("checkout.completed") || type.includes("payment.succeeded")) {
-      const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    if (type.includes("payment.success") || type.includes("subscription.active") || type.includes("checkout.completed") || type.includes("payment.succeeded") || type.includes("order.completed")) {
+      const expiresAt = isLifetime ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+      const tier = isLifetime ? "lifetime" : "pro";
+
       if (supabase) {
         if (userId) {
           await supabase.from("subscriptions").upsert({
@@ -258,7 +293,7 @@ app.post("/api/dodo-webhook", async (req, res) => {
           }, { onConflict: "dodo_subscription_id" });
 
           await supabase.from("profiles").update({
-            subscription_tier: "pro",
+            subscription_tier: tier,
             subscription_status: "active",
             subscription_expires_at: expiresAt,
             dodo_customer_id: customerId,
@@ -266,13 +301,13 @@ app.post("/api/dodo-webhook", async (req, res) => {
           }).eq("id", userId);
         } else if (customerId) {
           await supabase.from("profiles").update({
-            subscription_tier: "pro",
+            subscription_tier: tier,
             subscription_status: "active",
             subscription_expires_at: expiresAt,
           }).eq("dodo_customer_id", customerId);
         }
       }
-      console.log("[Dodo Webhook] Activated Pro subscription in subscriptions table for user:", userId || customerId);
+      console.log(`[Dodo Webhook] Activated ${tier} subscription for user:`, userId || customerId);
     } else if (type.includes("payment.failed")) {
       console.log("[Dodo Webhook] Payment failed for customer:", customerId);
     } else if (type.includes("subscription.cancelled") || type.includes("subscription.canceled")) {

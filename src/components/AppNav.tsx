@@ -19,7 +19,8 @@ import {
   UserPlus,
   CheckCircle2,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
@@ -63,6 +64,7 @@ export const AppNav: React.FC = () => {
   const navItems = [
     { path: "/app", label: "Dashboard", icon: <Home className="w-5 h-5" /> },
     { path: "/app/chat", label: "AI Coach", icon: <MessageCircle className="w-5 h-5" /> },
+    { path: "/app/insights", label: "Insights", icon: <Sparkles className="w-5 h-5" /> },
     { path: "/app/mood", label: "Mood", icon: <Smile className="w-5 h-5" /> },
     { path: "/app/breathe", label: "Breathe", icon: <Wind className="w-5 h-5" /> },
     { path: "/app/sleep", label: "Sleep", icon: <Moon className="w-5 h-5" /> },
@@ -149,13 +151,13 @@ export const AppNav: React.FC = () => {
                 >
                   {/* Sync Status Mini Indicator */}
                   {syncStatus === "syncing" && (
-                    <Loader2 className="w-3.5 h-3.5 text-[#00d4ff] animate-spin" title="Syncing..." />
+                    <span title="Syncing..."><Loader2 className="w-3.5 h-3.5 text-[#00d4ff] animate-spin" /></span>
                   )}
                   {syncStatus === "synced" && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" title="Data backed up" />
+                    <span title="Data backed up"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /></span>
                   )}
                   {syncStatus === "error" && (
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" title="Offline / Local only" />
+                    <span title="Offline / Local only"><AlertCircle className="w-3.5 h-3.5 text-amber-400" /></span>
                   )}
 
                   <span className="text-xs font-semibold text-white/90 hidden sm:inline max-w-[100px] truncate">

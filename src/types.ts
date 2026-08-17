@@ -68,18 +68,19 @@ export interface CrisisLog {
   message: string;
 }
 
-export type SubscriptionTier = "free" | "pro" | "plus";
+export type SubscriptionTier = "free" | "pro" | "plus" | "lifetime" | "plus_monthly" | "plus_yearly";
 export type SubscriptionStatus = "active" | "inactive" | "cancelled" | "trial" | "trialing";
-export type BillingPeriod = "monthly" | "yearly";
+export type BillingPeriod = "monthly" | "yearly" | "lifetime";
 
 export interface UserSubscription {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
-  expiresAt: string | null; // ISO string
+  expiresAt: string | null; // ISO string (null for lifetime)
   dodoCustomerId?: string;
   dodoSubscriptionId?: string;
   billingPeriod?: BillingPeriod;
   isTrial?: boolean;
+  isLifetime?: boolean;
 }
 
 

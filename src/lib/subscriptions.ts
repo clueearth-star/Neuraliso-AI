@@ -6,6 +6,8 @@ export const DODO_LINKS = {
   lifetime: import.meta.env.VITE_DODO_LIFETIME_LINK || "https://dodo.pe/j2z0q1cr8bh",
 };
 
+export const DODO_CUSTOMER_PORTAL_URL = import.meta.env.VITE_DODO_CUSTOMER_PORTAL_URL || "https://customer.dodopayments.com";
+
 export const LIFETIME_DEAL = {
   name: "Neuraliso Plus Lifetime",
   price: 20.92,

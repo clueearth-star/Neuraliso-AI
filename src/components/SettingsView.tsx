@@ -30,6 +30,7 @@ import { sounds } from "../lib/sounds";
 import { AppSettings } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useSubscription } from "../contexts/SubscriptionContext";
+import { DODO_CUSTOMER_PORTAL_URL } from "../lib/subscriptions";
 import { Crown } from "lucide-react";
 
 export const SettingsView: React.FC = () => {
@@ -315,7 +316,7 @@ export const SettingsView: React.FC = () => {
 
                   <div className="flex items-center gap-2.5 shrink-0">
                     <a
-                      href="https://app.dodo.payments.com/portal"
+                      href={DODO_CUSTOMER_PORTAL_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -340,7 +341,7 @@ export const SettingsView: React.FC = () => {
                           type="button"
                           onClick={async () => {
                             sounds.playClick();
-                            await upgradeToPro(billingPeriod || "monthly", true);
+                            await upgradeToPro(billingPeriod || "monthly");
                           }}
                           className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#0B1121] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1"
                         >

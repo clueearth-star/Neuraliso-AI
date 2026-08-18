@@ -21,6 +21,7 @@ import { Signup } from "./components/auth/Signup";
 import { ForgotPassword } from "./components/auth/ForgotPassword";
 import { ResetPassword } from "./components/auth/ResetPassword";
 import { PricingView } from "./components/subscription/PricingView";
+import { PrivacyPage } from "./components/PrivacyPage";
 import { UpgradeModal } from "./components/subscription/UpgradeModal";
 import { LifetimeDealBanner } from "./components/subscription/LifetimeDealBanner";
 import { LifetimeCheckoutModal } from "./components/subscription/LifetimeCheckoutModal";
@@ -84,6 +85,7 @@ export function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<PricingView />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/chat" element={<Navigate to="/app/chat" replace />} />

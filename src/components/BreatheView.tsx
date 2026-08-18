@@ -242,6 +242,9 @@ export const BreatheView: React.FC = () => {
 
         {/* Inner Solid Circle with Phase Cues */}
         <div 
+          role="region"
+          aria-live="polite"
+          aria-label={isRunning ? `${currentPhase.label}, ${secondsLeftInPhase} seconds remaining` : "Breathing session ready"}
           className={`w-52 h-52 sm:w-64 sm:h-64 rounded-full bg-[#1A2338] border-2 border-[#00d4ff]/60 shadow-[0_0_50px_rgba(0,212,255,0.3)] flex flex-col items-center justify-center p-6 text-center z-10 transition-all ${
             isRunning ? "shadow-[0_0_80px_rgba(0,212,255,0.5)]" : ""
           }`}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Sparkles, Check, ShieldCheck, Lock, Zap, Crown, HeartHandshake, PartyPopper, CheckCircle2, RotateCcw } from "lucide-react";
+import { X, Sparkles, Check, ShieldCheck, Lock, Crown, HeartHandshake, PartyPopper, CheckCircle2, RotateCcw } from "lucide-react";
 import confetti from "canvas-confetti";
 import { useSubscription } from "../../contexts/SubscriptionContext";
 import { LIFETIME_DEAL } from "../../lib/subscriptions";
@@ -106,7 +106,6 @@ export const LifetimeCheckoutModal: React.FC = () => {
   const { isLifetimeModalOpen, closeLifetimeModal, buyLifetimeDeal, isLifetime } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [simulateMode, setSimulateMode] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
 
   // If modal is not requested and no active success screen, don't render
@@ -118,18 +117,7 @@ export const LifetimeCheckoutModal: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      if (simulateMode) {
-        const res = await buyLifetimeDeal(true);
-        if (res?.success) {
-          setPurchaseSuccess(true);
-          triggerConfettiCelebration();
-        }
-      } else {
-        const res = await buyLifetimeDeal(false);
-        if (res?.success) {
-          triggerConfettiCelebration();
-        }
-      }
+      await buyLifetimeDeal();
     } catch (e: any) {
       setError(e.message || "Unable to proceed to checkout");
     } finally {
@@ -330,22 +318,6 @@ export const LifetimeCheckoutModal: React.FC = () => {
                 {error}
               </div>
             )}
-
-            {/* Preview Simulation Option */}
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <label className="inline-flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={simulateMode}
-                  onChange={(e) => setSimulateMode(e.target.checked)}
-                  className="rounded border-white/20 bg-white/5 text-[#FFD700] focus:ring-[#FFD700]"
-                />
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-[#FFD700]" />
-                  <span>Preview Mode: Instant Test Activation with Confetti Celebration</span>
-                </span>
-              </label>
-            </div>
 
             {/* Actions */}
             <div className="space-y-3">

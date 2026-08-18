@@ -28,8 +28,8 @@ export interface SubscriptionContextType {
   closeUpgradeModal: () => void;
   openLifetimeModal: () => void;
   closeLifetimeModal: () => void;
-  upgradeToPro: (plan: "monthly" | "yearly" | "lifetime", simulate?: boolean) => Promise<{ success: boolean; error?: string }>;
-  buyLifetimeDeal: (simulate?: boolean) => Promise<{ success: boolean; error?: string }>;
+  upgradeToPro: (plan?: "monthly" | "yearly" | "lifetime") => Promise<{ success: boolean; error?: string }>;
+  buyLifetimeDeal: () => Promise<{ success: boolean; error?: string }>;
   startFreeTrial: () => Promise<{ success: boolean; error?: string }>;
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
   checkFeatureAccess: (feature: "mood" | "reframe" | "chat" | "breathe" | "sleep" | "progress", count?: number) => boolean;
@@ -295,33 +295,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setSuccessToast(null);
   }, []);
 
-  const buyLifetimeDeal = useCallback(async (simulate = false): Promise<{ success: boolean; error?: string }> => {
+  const buyLifetimeDeal = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (simulate) {
-        const updated: UserSubscription = {
-          tier: "lifetime",
-          status: "active",
-          expiresAt: null,
-          billingPeriod: "lifetime",
-          isLifetime: true,
-        };
-        setSub(updated);
-        storage.saveSubscription(updated);
-
-        if (user && isSupabaseConfigured()) {
-          await supabase.from("profiles").update({
-            subscription_tier: "lifetime",
-            subscription_status: "active",
-            subscription_expires_at: null
-          }).eq("id", user.id);
-        }
-
-        setIsLifetimeModalOpen(false);
-        setIsModalOpen(false);
-        triggerLifetimeCelebration();
-        return { success: true };
-      }
-
       const checkoutUrl = getDodoCheckoutUrl("lifetime", user);
       console.log("Redirecting to Dodo Lifetime Checkout URL:", checkoutUrl);
       window.location.href = checkoutUrl;
@@ -331,38 +306,13 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       window.location.href = LIFETIME_DEAL.link;
       return { success: true };
     }
-  }, [user, triggerLifetimeCelebration]);
+  }, [user]);
 
-  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly" | "lifetime" = "monthly", simulate = false): Promise<{ success: boolean; error?: string }> => {
+  const upgradeToPro = useCallback(async (plan: "monthly" | "yearly" | "lifetime" = "monthly"): Promise<{ success: boolean; error?: string }> => {
     if (plan === "lifetime") {
-      return buyLifetimeDeal(simulate);
+      return buyLifetimeDeal();
     }
     try {
-      if (simulate) {
-        const days = plan === "monthly" ? 30 : 365;
-        const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-        const newSub: UserSubscription = {
-          tier: "pro",
-          status: "active",
-          expiresAt,
-          billingPeriod: plan,
-          isTrial: false,
-        };
-        setSub(newSub);
-        storage.saveSubscription(newSub);
-
-        if (user && isSupabaseConfigured()) {
-          await supabase.from("profiles").update({
-            subscription_tier: "pro",
-            subscription_status: "active",
-            subscription_expires_at: expiresAt
-          }).eq("id", user.id);
-        }
-
-        setIsModalOpen(false);
-        return { success: true };
-      }
-
       const fallbackUrl = "https://checkout.dodopayments.com/buy/pdt_0NjZcNQU20nKx7FEP7N5V?quantity=1&redirect_url=https://neuraliso-ai.vercel.app";
       const checkoutUrl = getDodoCheckoutUrl(plan, user) || fallbackUrl;
       console.log("Redirecting to Dodo Checkout URL:", checkoutUrl);
@@ -376,33 +326,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [user, buyLifetimeDeal]);
 
   const startFreeTrial = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const newSub: UserSubscription = {
-        tier: "pro",
-        status: "trial",
-        expiresAt,
-        billingPeriod: "yearly",
-        isTrial: true,
-      };
-      setSub(newSub);
-      storage.saveSubscription(newSub);
-
-      if (user && isSupabaseConfigured()) {
-        await supabase.from("profiles").update({
-          subscription_tier: "pro",
-          subscription_status: "trial",
-          subscription_expires_at: expiresAt
-        }).eq("id", user.id);
-      }
-
-      setIsModalOpen(false);
-      return { success: true };
-    } catch (e: any) {
-      console.error("Trial error:", e);
-      return { success: false, error: e.message || "Failed to start trial" };
-    }
-  }, [user]);
+    // Requires entering card / payment details through Dodo checkout
+    return upgradeToPro("yearly");
+  }, [upgradeToPro]);
 
   const cancelSubscription = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {

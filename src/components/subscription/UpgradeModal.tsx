@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Moon, Wind, Bot, Sparkles, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { X, Moon, Wind, Bot, Sparkles, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useSubscription } from "../../contexts/SubscriptionContext";
 
 export const UpgradeModal: React.FC = () => {
@@ -9,13 +9,11 @@ export const UpgradeModal: React.FC = () => {
     modalFeature, 
     closeUpgradeModal, 
     openLifetimeModal, 
-    upgradeToPro, 
-    startFreeTrial 
+    upgradeToPro
   } = useSubscription();
   const [selectedPlan, setSelectedPlan] = useState<"yearly" | "monthly">("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [simulateMode, setSimulateMode] = useState(false); // Default false for Dodo checkout
 
   if (!isModalOpen) return null;
 
@@ -166,22 +164,6 @@ export const UpgradeModal: React.FC = () => {
             {error}
           </div>
         )}
-
-        {/* Preview Simulation Toggle */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <label className="inline-flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={simulateMode}
-              onChange={(e) => setSimulateMode(e.target.checked)}
-              className="rounded border-white/20 bg-white/5 text-[#FFD700] focus:ring-[#FFD700]"
-            />
-            <span className="flex items-center gap-1">
-              <Zap className="w-3 h-3 text-[#FFD700]" />
-              <span>Preview Mode: Instant Test Checkout (No card required)</span>
-            </span>
-          </label>
-        </div>
 
         {/* CTA Buttons */}
         <div className="space-y-3">

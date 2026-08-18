@@ -92,7 +92,7 @@ export const Onboarding: React.FC = () => {
 
     if (withPlus) {
       setPaymentLoading(true);
-      await upgradeToPro(selectedPlan === "annual" ? "yearly" : "monthly", true);
+      await upgradeToPro(selectedPlan === "annual" ? "yearly" : "monthly");
       setPaymentLoading(false);
     } else {
       navigate("/app");

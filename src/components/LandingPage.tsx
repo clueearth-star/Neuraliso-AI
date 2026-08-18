@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { 
   Smile, 
   Wind, 
@@ -10,14 +10,23 @@ import {
   MessageSquare, 
   ShieldCheck, 
   ArrowRight, 
-  CheckCircle2, 
+  Check, 
   Lock, 
   Heart,
   Sparkles,
-  X
+  X,
+  HardDrive,
+  Bot,
+  Zap,
+  Star,
+  CheckCircle2,
+  Building2
 } from "lucide-react";
 import { CrisisBanner } from "./CrisisBanner";
 import { BrainLotusLogo } from "./BrainLotusLogo";
+import { HowItWorks } from "./HowItWorks";
+import { Testimonials } from "./Testimonials";
+import { Pricing } from "./Pricing";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
 import neuralisoLogo from "../assets/images/neuraliso_logo_1783904719183.jpg";
@@ -45,437 +54,434 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative z-10 bg-[#0B1121] text-white">
+    <div className="min-h-screen flex flex-col relative z-10 bg-[#0B1121] text-white selection:bg-[#00d4ff] selection:text-[#0B1121] overflow-x-hidden pb-safe">
+      {/* 0. Accessible Skip to Content Link */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* 1. Crisis banner at very top */}
       <CrisisBanner />
 
-      {/* 2. Nav bar */}
-      <header className="sticky top-0 z-40 bg-[#0B1121]/80 backdrop-blur-xl border-b border-white/10 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      {/* 2. Nav bar - Max 56px on mobile */}
+      <header className="sticky top-0 z-40 bg-[#0B1121]/90 backdrop-blur-xl border-b border-white/10 h-14 sm:h-16 flex items-center transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex items-center justify-between">
           {/* Logo */}
           <div 
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group min-h-[44px]"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+            aria-label="Neuraliso Home"
           >
             <div className="w-8 h-8 rounded-full overflow-hidden border border-[#00d4ff]/40 shadow-sm shadow-[#00d4ff]/20 group-hover:scale-110 transition-all duration-300">
-              <img src={neuralisoLogo} alt="Neuraliso Logo" className="w-full h-full object-cover" />
+              <img src={neuralisoLogo} alt="Neuraliso Logo" className="w-full h-full object-cover" width="32" height="32" loading="eager" />
             </div>
-            <span className="font-serif font-bold italic text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] via-[#00b8a9] to-emerald-400">
+            <span className="font-serif font-bold italic text-xl tracking-tight text-white">
               Neuraliso
             </span>
           </div>
 
           {/* Nav Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
-            <button onClick={() => scrollToSection("how-it-works")} className="hover:text-white transition-colors cursor-pointer">
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300" aria-label="Main Navigation">
+            <button 
+              type="button"
+              onClick={() => scrollToSection("how-it-works")} 
+              className="hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
               How it works
             </button>
-            <button onClick={() => scrollToSection("features")} className="hover:text-white transition-colors cursor-pointer">
+            <button 
+              type="button"
+              onClick={() => scrollToSection("features")} 
+              className="hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
               Features
             </button>
-            <button onClick={() => setActiveModal("about")} className="hover:text-white transition-colors cursor-pointer">
+            <button 
+              type="button"
+              onClick={() => scrollToSection("pricing")} 
+              className="hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
+              Pricing
+            </button>
+            <button 
+              type="button"
+              onClick={() => setActiveModal("about")} 
+              className="hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
               About
             </button>
           </nav>
 
           {/* Get started button */}
           <button
+            type="button"
             onClick={handleStart}
-            className="px-5 py-2 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-md shadow-[#00d4ff]/20 cursor-pointer"
+            aria-label="Get Started with Neuraliso"
+            className="px-5 py-2 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-md shadow-[#00d4ff]/20 cursor-pointer min-h-[44px] flex items-center justify-center"
           >
-            Get started
+            Get Started
           </button>
         </div>
       </header>
 
-      {/* 3. Hero Section */}
-      <section className="relative pt-16 pb-24 md:pt-24 md:pb-32 px-4 text-center overflow-hidden">
-        <div className="max-w-4xl mx-auto space-y-8 animate-page-in">
-          {/* Brain-lotus SVG logo with glow */}
-          <div className="flex justify-center">
-            <BrainLotusLogo size={130} />
-          </div>
-
-          {/* Headline & Subtitle */}
-          <div className="space-y-4 max-w-2xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
-              A quiet space <br className="hidden sm:inline" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] via-[#00b8a9] to-emerald-300">
-                for your mind
-              </span>
-            </h1>
-            <p className="text-lg sm:text-xl text-white/70 leading-relaxed max-w-xl mx-auto">
-              Guided breathing, mood check-ins, and sleep tools.
-            </p>
-          </div>
-
-          {/* Two CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <button
-              onClick={handleStart}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] text-[#0B1121] font-bold text-base hover:scale-105 active:scale-95 transition-all shadow-lg shadow-[#00d4ff]/25 flex items-center justify-center gap-2.5 cursor-pointer"
-            >
-              <span>Start your first check-in</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => scrollToSection("how-it-works")}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-base hover:scale-105 active:scale-95 transition-all cursor-pointer"
-            >
-              See how it works
-            </button>
-          </div>
-
-          {/* Trust Badge */}
-          <div className="pt-6 flex items-center justify-center gap-2 text-xs sm:text-sm text-white/60 bg-white/5 border border-white/10 py-2.5 px-5 rounded-full w-fit mx-auto">
-            <ShieldCheck className="w-4 h-4 text-[#00b8a9] shrink-0" />
-            <span>Powered by secure Supabase database &amp; optional OAuth cloud sync.</span>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. How it works */}
-      <section id="how-it-works" className="py-24 px-4 bg-[#111A2E]/50 border-y border-white/5 relative">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              How it works
-            </h2>
-            <p className="text-base text-white/60">
-              Simple, daily practices built for real life. No pressure, no guilt.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 */}
-            <div className="wellness-card p-8 space-y-5 text-left relative">
-              <div className="w-12 h-12 rounded-2xl bg-[#00d4ff]/10 border border-[#00d4ff]/30 flex items-center justify-center text-[#00d4ff] text-xl font-bold font-mono">
-                01
-              </div>
-              <h3 className="text-2xl font-bold text-white">Check in</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Log how you feel without judgment. Track your mood, note what is on your mind, and select gentle emotional tags in under 30 seconds.
-              </p>
+      {/* Main Content Landmark */}
+      <main id="main-content" className="flex-1">
+        
+        {/* 3. Hero Section (Audited Value Prop & Primary CTA) */}
+        <section 
+          aria-labelledby="hero-title"
+          className="relative pt-12 pb-16 sm:pt-20 sm:pb-24 px-4 sm:px-6 lg:px-8 text-center overflow-hidden"
+        >
+          <div className="max-w-4xl mx-auto space-y-8 animate-page-in">
+            {/* Brain-lotus SVG logo with glow */}
+            <div className="flex justify-center" aria-hidden="true">
+              <BrainLotusLogo size={120} />
             </div>
 
-            {/* Step 2 */}
-            <div className="wellness-card p-8 space-y-5 text-left relative">
-              <div className="w-12 h-12 rounded-2xl bg-[#00b8a9]/10 border border-[#00b8a9]/30 flex items-center justify-center text-[#00b8a9] text-xl font-bold font-mono">
-                02
-              </div>
-              <h3 className="text-2xl font-bold text-white">Find your tool</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Choose what you need in the moment: guided breathing exercises, calming sounds &amp; sleep stories, or structured CBT thought reframing.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="wellness-card p-8 space-y-5 text-left relative">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xl font-bold font-mono">
-                03
-              </div>
-              <h3 className="text-2xl font-bold text-white">Build the habit</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Watch your emotional patterns become clearer over time with gentle streak tracking that celebrates your consistency without ever shaming you.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Features Section */}
-      <section id="features" className="py-24 px-4">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <div className="text-center space-y-4 max-w-2xl mx-auto">
-            <span className="text-xs font-mono font-bold tracking-widest uppercase text-[#00d4ff] bg-[#00d4ff]/10 px-3 py-1 rounded-full border border-[#00d4ff]/20">
-              Everything You Need
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              Built for quick relief when you need it most
-            </h2>
-            <p className="text-base text-white/60">
-              Your privacy matters. We keep your data safe by storing everything directly in your browser.
-            </p>
-          </div>
-
-          {/* 5 Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* 1. Mood Check-in */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-                <Smile className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Mood Check-in</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Quickly log your emotion with simple faces, optional reflective notes, and contextual tags. See how your feelings evolve day by day.
-              </p>
-            </div>
-
-            {/* 2. Guided Breathing */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-[#00d4ff]/15 border border-[#00d4ff]/30 flex items-center justify-center text-[#00d4ff] group-hover:scale-110 transition-transform">
-                <Wind className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Guided Breathing</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Breathing exercises including Box breathing (4-4-4-4), 4-7-8 sleep breathing, and slow grounding rhythms with visual expansion cues.
-              </p>
-            </div>
-
-            {/* 3. Sleep Sounds */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
-                <Moon className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Sleep Sounds</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Calming sounds &amp; sleep stories with synthesized rain, white noise, brown noise, and soothing binaural theta frequencies with auto-timers.
-              </p>
-            </div>
-
-            {/* 4. Thought Reframe */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-110 transition-transform">
-                <RefreshCw className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Thought Reframe</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                A 4-step Cognitive Behavioral Therapy (CBT) journal tool to help you identify automatic negative thoughts and build balanced perspectives.
-              </p>
-            </div>
-
-            {/* 5. Progress */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Progress &amp; Insights</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                Visualize your mood history with interactive charts, local pattern recognition, and trend insights surfaced directly in your browser.
-              </p>
-            </div>
-
-            {/* 6. CBT AI Coach */}
-            <div className="wellness-card p-8 space-y-4 text-left group">
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-7 h-7" />
-              </div>
-              <h3 className="text-xl font-bold text-white">CBT AI Companion</h3>
-              <p className="text-sm text-white/60 leading-relaxed">
-                24/7 empathetic conversational coach powered by Google Gemini 3.6 Flash under a strict zero data retention policy.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* AI Transparency & Privacy Matrix Section */}
-      <section className="py-20 px-4 bg-[#0D1424] border-t border-[#00d4ff]/20">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <span className="text-xs font-mono font-bold tracking-widest uppercase text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              AI Transparency &amp; Data Policy
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Exactly how AI works in Neuraliso
-            </h2>
-            <p className="text-sm sm:text-base text-white/70">
-              We believe in complete privacy and clarity. Here is where every AI feature runs and what data it touches.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-            {/* 1. Local Sentiment Tagging */}
-            <div className="wellness-card p-7 space-y-4 border border-emerald-500/30 bg-emerald-950/10">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] font-mono uppercase">
-                  100% On-Device
+            {/* Clear Hero Headline: Answers "What does this do for me?" in under 3 seconds */}
+            <div className="space-y-4 max-w-2xl mx-auto">
+              <h1 id="hero-title" className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight">
+                Quiet your mind <br className="hidden sm:inline" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] via-[#00b8a9] to-emerald-300">
+                  in 60 seconds.
                 </span>
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Local Sentiment Tagging</h3>
-              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
-                <li>• <strong>What it does:</strong> Analyzes journal reflection text to auto-suggest emotional tags (e.g. Anxious, Stressed, Calming).</li>
-                <li>• <strong>Where it runs:</strong> 100% inside your browser memory (0 network requests).</li>
-                <li>• <strong>Data touched:</strong> Journal text stays strictly on your local device.</li>
-              </ul>
+              </h1>
+              <p className="text-base sm:text-xl text-slate-200 leading-relaxed max-w-xl mx-auto font-normal">
+                Private mood tracking, breathing exercises, and sleep tools — no signup required.
+              </p>
             </div>
 
-            {/* 2. Trend & Pattern Insights */}
-            <div className="wellness-card p-7 space-y-4 border border-[#00d4ff]/30 bg-[#00d4ff]/5">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded-full bg-[#00d4ff]/20 text-[#00d4ff] font-bold text-[10px] font-mono uppercase">
-                  100% On-Device
-                </span>
-                <ShieldCheck className="w-5 h-5 text-[#00d4ff]" />
+            {/* High-Contrast Primary CTA Button Directly Under H1 */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  id="hero-primary-cta"
+                  aria-label="Get Started with Neuraliso"
+                  className="w-full sm:w-auto px-9 py-4 rounded-full bg-gradient-to-r from-[#00d4ff] to-[#00b8a9] hover:from-[#38e1ff] hover:to-[#14d6c4] text-[#0B1121] font-extrabold text-base sm:text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#00d4ff]/30 flex items-center justify-center gap-2.5 cursor-pointer min-h-[48px]"
+                >
+                  <span>Get Started</span>
+                  <ArrowRight className="w-5 h-5" />
+                </button>
               </div>
-              <h3 className="text-xl font-bold text-white">Pattern Recognition</h3>
-              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
-                <li>• <strong>What it does:</strong> Surfaces evening anxiety trends and suggests targeted breathing or sleep sound exercises.</li>
-                <li>• <strong>Where it runs:</strong> Local JavaScript pattern engine in your browser.</li>
-                <li>• <strong>Data touched:</strong> Local mood history timestamps &amp; tags.</li>
-              </ul>
+
+              {/* Secondary link smooth-scrolling to feature / how-it-works */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("how-it-works")}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer min-h-[44px] px-3"
+                >
+                  <span>How it works &rarr;</span>
+                </button>
+              </div>
+
+              {/* No Credit Card Required Banner */}
+              <div className="pt-2 flex items-center justify-center gap-2 text-xs sm:text-sm text-slate-300">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>No credit card required to start &bull; 100% Free Forever tier</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Immediate Clarity: 3-Step "How It Works" Section */}
+        <HowItWorks />
+
+        {/* 5. Features Section (Plain English, Zero Jargon) */}
+        <section id="features" aria-labelledby="features-heading" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-20">
+          <div className="max-w-6xl mx-auto space-y-12">
+            <div className="text-center space-y-3 max-w-2xl mx-auto">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00d4ff]/10 border border-[#00d4ff]/20 text-[#00d4ff] text-xs font-bold uppercase tracking-wider">
+                <span>Core Wellness Tools</span>
+              </div>
+              <h2 id="features-heading" className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+                Everything you need for instant calm
+              </h2>
+              <p className="text-sm sm:text-base text-slate-300">
+                Gentle self-care tools designed for real daily life. Private by default in your browser.
+              </p>
             </div>
 
-            {/* 3. Optional CBT AI Companion */}
-            <div className="wellness-card p-7 space-y-4 border border-purple-500/30 bg-purple-950/10">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[10px] font-mono uppercase">
-                  Stateless Cloud Proxy
-                </span>
-                <Lock className="w-5 h-5 text-purple-400" />
+            {/* 6 Grid Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* 1. Mood Check-in */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-amber-500/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400"
+                >
+                  <Smile className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Mood Check-in</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Quickly log your emotions with 5 friendly faces, optional reflections, and contextual tags in under 10 seconds.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-white">CBT AI Companion</h3>
-              <ul className="text-xs text-white/80 space-y-2 leading-relaxed">
-                <li>• <strong>What it does:</strong> Provides 24/7 conversational CBT coaching &amp; thought reframing.</li>
-                <li>• <strong>Provider &amp; Model:</strong> Google Gemini 3.6 Flash via serverless proxy.</li>
-                <li>• <strong>Data Retention Policy:</strong> <strong>Zero Data Retention</strong>. Chat prompts are processed statelessly in volatile memory and immediately discarded.</li>
-              </ul>
+
+              {/* 2. Guided Breathing */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-[#00d4ff]/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-[#00d4ff]/15 border border-[#00d4ff]/30 flex items-center justify-center text-[#00d4ff]"
+                >
+                  <Wind className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Guided Breathing</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Box breathing (4-4-4-4) and 4-7-8 rhythms with soothing visual expansion rings and text instructions for screen-reader ease.
+                </p>
+              </div>
+
+              {/* 3. Sleep Sounds */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-indigo-500/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400"
+                >
+                  <Moon className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Calming Sleep Sounds</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Synthesized ambient rain, brown noise, ocean waves, and soothing background soundscapes with gentle auto-timers.
+                </p>
+              </div>
+
+              {/* 4. Thought Reframe */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-teal-500/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400"
+                >
+                  <RefreshCw className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Thought Reframing</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  A simple 4-step guided journal tool to help unpack negative thoughts and build balanced, healthy perspectives.
+                </p>
+              </div>
+
+              {/* 5. Progress */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-emerald-500/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400"
+                >
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Private Progress Trends</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Visualize your emotional trends over time with clean charts calculated 100% locally inside your browser.
+                </p>
+              </div>
+
+              {/* 6. AI Companion */}
+              <div className="wellness-card p-6 sm:p-7 space-y-4 text-left border border-white/10 hover:border-purple-500/40 transition-all bg-white/[0.03]">
+                <div 
+                  aria-hidden="true" 
+                  className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400"
+                >
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold text-white">24/7 AI Companion</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Empathetic conversational guidance for thought reframing with a strict Zero Data Retention privacy policy.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 6. Crisis Section */}
-      <section className="py-20 px-4 bg-gradient-to-b from-[#111A2E]/80 to-[#0B1121] border-t border-rose-500/20 text-center relative">
-        <div className="max-w-3xl mx-auto space-y-8">
-          <div className="w-16 h-16 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto">
-            <Heart className="w-8 h-8 fill-current" />
-          </div>
-          <div className="space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-              Need help right now?
-            </h2>
-            <p className="text-base text-white/70 max-w-xl mx-auto">
-              If you are going through a difficult time, you don&apos;t have to handle it alone. Immediate, confidential support is available 24/7.
-            </p>
-          </div>
+        {/* 6. Social Proof Section */}
+        <Testimonials />
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-            <a
-              href="tel:988"
-              onClick={() => sounds.playClick()}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-base transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2.5"
+        {/* 7. Transparent Pricing Section */}
+        <Pricing embedded={true} />
+
+        {/* 8. 24/7 Crisis Support Section */}
+        <section 
+          aria-labelledby="crisis-heading"
+          className="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#111A2E]/80 to-[#0B1121] border-t border-rose-500/20 text-center relative"
+        >
+          <div className="max-w-3xl mx-auto space-y-6">
+            <div 
+              aria-hidden="true"
+              className="w-14 h-14 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto"
             >
-              <Phone className="w-5 h-5" />
-              <span>Call 988 (Lifeline)</span>
-            </a>
-            <a
-              href="sms:741741?body=HOME"
-              onClick={() => sounds.playClick()}
-              className="w-full sm:w-auto px-8 py-4 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-base transition-all flex items-center justify-center gap-2.5"
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span>Text HOME to 741741</span>
-            </a>
-          </div>
-        </div>
-      </section>
+              <Heart className="w-7 h-7 fill-current" />
+            </div>
+            <div className="space-y-2">
+              <h2 id="crisis-heading" className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
+                Need immediate help?
+              </h2>
+              <p className="text-sm sm:text-base text-slate-200 max-w-xl mx-auto leading-relaxed">
+                If you are experiencing acute emotional distress, free and confidential support is available 24/7.
+              </p>
+            </div>
 
-      {/* 7. Footer */}
-      <footer className="py-12 px-4 border-t border-white/10 bg-[#0B1121] text-xs text-white/50">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+              <a
+                href="tel:988"
+                onClick={() => sounds.playClick()}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm sm:text-base transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2.5 min-h-[44px]"
+              >
+                <Phone className="w-5 h-5" />
+                <span>Call 988 (Lifeline)</span>
+              </a>
+              <a
+                href="sms:741741?body=HOME"
+                onClick={() => sounds.playClick()}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-sm sm:text-base transition-all flex items-center justify-center gap-2.5 min-h-[44px]"
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span>Text HOME to 741741</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      {/* 9. Trust Badges & Footer (Audited with 3 explicit badges & privacy link) */}
+      <footer className="py-12 px-4 sm:px-6 lg:px-8 border-t border-white/10 bg-[#0B1121] text-xs text-slate-300">
         <div className="max-w-7xl mx-auto space-y-8">
+          
+          {/* 3 Explicit Trust Badges */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-white/10">
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3 text-left">
+              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <div className="font-bold text-white text-xs">Privacy First</div>
+                <div className="text-slate-400 text-[11px]">Your data never leaves your browser unless you enable sync.</div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3 text-left">
+              <HardDrive className="w-5 h-5 text-[#00d4ff] shrink-0" />
+              <div>
+                <div className="font-bold text-white text-xs">Independently Built &amp; Auditable</div>
+                <div className="text-slate-400 text-[11px]">Zero ad trackers, zero telemetry reselling.</div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3 text-left">
+              <Zap className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <div className="font-bold text-white text-xs">Always Available</div>
+                <div className="text-slate-400 text-[11px]">Works offline on planes, trains, and low connectivity.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nav & Links */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full overflow-hidden border border-[#00d4ff]/40">
-                <img src={neuralisoLogo} alt="Logo" className="w-full h-full object-cover" />
+              <div className="w-7 h-7 rounded-full overflow-hidden border border-[#00d4ff]/40">
+                <img src={neuralisoLogo} alt="Logo" className="w-full h-full object-cover" width="28" height="28" />
               </div>
               <span className="font-serif font-bold italic text-base text-white">Neuraliso</span>
             </div>
 
-            <div className="flex items-center gap-6 font-medium">
-              <button onClick={() => setActiveModal("privacy")} className="hover:text-white transition-colors cursor-pointer">
-                Privacy Policy
-              </button>
-              <button onClick={() => setActiveModal("terms")} className="hover:text-white transition-colors cursor-pointer">
+            <div className="flex flex-wrap items-center justify-center gap-6 font-medium">
+              <Link to="/privacy" className="text-slate-300 hover:text-white transition-colors underline decoration-white/20 min-h-[44px] flex items-center">
+                Security &amp; Privacy Policy
+              </Link>
+              <Link to="/pricing" className="text-slate-300 hover:text-white transition-colors min-h-[44px] flex items-center">
+                Pricing Tiers
+              </Link>
+              <button 
+                type="button"
+                onClick={() => setActiveModal("terms")} 
+                className="text-slate-300 hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+              >
                 Terms of Service
               </button>
-              <button onClick={() => setActiveModal("about")} className="hover:text-white transition-colors cursor-pointer">
-                About
+              <button 
+                type="button"
+                onClick={() => setActiveModal("about")} 
+                className="text-slate-300 hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
+              >
+                About the Builder
               </button>
-              <a href="tel:988" className="text-rose-400 hover:text-rose-300 font-bold transition-colors">
-                Crisis Resources (988)
+              <a href="tel:988" className="text-rose-400 hover:text-rose-300 font-bold transition-colors min-h-[44px] flex items-center">
+                Crisis Help (988)
               </a>
             </div>
           </div>
 
+          {/* Tech stack note & Disclaimer */}
           <div className="border-t border-white/5 pt-6 text-center md:text-left space-y-3">
-            <p className="leading-relaxed max-w-4xl text-white/40">
-              <strong className="text-white/60">Disclaimer:</strong> Neuraliso is not a substitute for professional medical advice, diagnosis, or treatment. It is a self-care wellness companion designed for mindfulness and relaxation. If you are experiencing acute psychological distress or a medical emergency, please contact your doctor or emergency services immediately.
+            <p className="leading-relaxed max-w-4xl text-slate-400">
+              <strong className="text-slate-200">Disclaimer:</strong> Neuraliso is a self-care wellness companion designed for mindfulness and relaxation. It is not a substitute for professional medical or psychiatric diagnosis, advice, or treatment. If you are experiencing a medical or psychiatric crisis, please reach out to emergency services immediately.
             </p>
-            <p className="text-white/30">
-              &copy; {new Date().getFullYear()} Neuraliso. Built with care for emotional wellness.
-            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400 text-[11px]">
+              <span>&copy; {new Date().getFullYear()} Neuraliso. Built with care for emotional peace of mind.</span>
+              <span>Cloud infrastructure (optional sync) powered by Supabase with Row Level Security.</span>
+            </div>
           </div>
         </div>
       </footer>
 
-      {/* Modals for Privacy, Terms, About */}
+      {/* About & Terms Modals */}
       {activeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-page-in">
-          <div className="w-full max-w-xl bg-[#1A2338] border border-white/10 rounded-3xl p-6 sm:p-8 text-left space-y-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+          <div className="w-full max-w-xl bg-[#1A2338] border border-white/15 rounded-3xl p-6 sm:p-8 text-left space-y-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
             <button
+              type="button"
               onClick={() => setActiveModal(null)}
-              className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
+              className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {activeModal === "privacy" && (
-              <div className="space-y-4 text-sm text-white/80 leading-relaxed">
+            {activeModal === "about" && (
+              <div className="space-y-4 text-sm text-slate-200 leading-relaxed">
                 <div className="flex items-center gap-2 text-[#00d4ff] font-bold text-lg">
-                  <Lock className="w-5 h-5" />
-                  <h3>Privacy Policy</h3>
+                  <Sparkles className="w-5 h-5" />
+                  <h3>About Neuraliso &amp; Why We Built It</h3>
                 </div>
                 <p>
-                  <strong>Your privacy matters. We keep your data safe.</strong>
+                  Neuraliso was created to solve a modern crisis: mental health applications have become cluttered with predatory subscriptions, forced email capture, invasive advertising trackers, and dark UX patterns.
                 </p>
                 <p>
-                  Neuraliso is designed with offline-first privacy. When you log your mood, write journal notes, reframe CBT thoughts, or customize settings, all information is stored strictly within your browser&apos;s local storage (`localStorage`).
+                  Our mission is simple: provide honest, evidence-based self-care tools (paced breathing, CBT thought reframing, calming sleep audio) that start in under 60 seconds with zero friction and 100% browser-level privacy.
                 </p>
-                <p>
-                  We do not transmit your personal reflections, check-in timestamps, or emotional tags to any cloud server, third-party tracker, or data broker. You have complete ownership of your data and can export or erase it at any time from the Settings menu.
-                </p>
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-1.5 text-xs text-slate-300">
+                  <div className="font-bold text-white">AI Transparency Note:</div>
+                  <p>Our conversational CBT companion uses Google Gemini 3.6 Flash statelessly via a secure zero-data-retention proxy. Your reflections are never stored or used to train models.</p>
+                </div>
               </div>
             )}
 
             {activeModal === "terms" && (
-              <div className="space-y-4 text-sm text-white/80 leading-relaxed">
+              <div className="space-y-4 text-sm text-slate-200 leading-relaxed">
                 <div className="flex items-center gap-2 text-[#00b8a9] font-bold text-lg">
                   <ShieldCheck className="w-5 h-5" />
                   <h3>Terms of Service</h3>
                 </div>
                 <p>
-                  By using Neuraliso, you agree to use this application for personal mindfulness, grounding, and emotional self-reflection.
+                  By using Neuraliso, you agree to use this application for personal mindfulness, relaxation, and self-reflection.
                 </p>
                 <p>
-                  Neuraliso provides guided breathing rhythms, audio ambient synthesizers, and cognitive reframing prompts for general wellness purposes only. It does not provide clinical therapy, psychiatric diagnosis, or emergency psychiatric intervention.
-                </p>
-              </div>
-            )}
-
-            {activeModal === "about" && (
-              <div className="space-y-4 text-sm text-white/80 leading-relaxed">
-                <div className="flex items-center gap-2 text-[#00d4ff] font-bold text-lg">
-                  <Sparkles className="w-5 h-5" />
-                  <h3>About Neuraliso</h3>
-                </div>
-                <p>
-                  Neuraliso was created to provide a quiet, judgment-free space for emotional wellness without the friction of sign-ups, subscriptions, or invasive data collection.
-                </p>
-                <p>
-                  Our goal is simple: offer effective evidence-based mindfulness tools—such as paced breathing, Cognitive Behavioral Therapy (CBT) journaling, and ambient acoustic therapy—accessible to anyone, anytime.
-                </p>
-                <p className="text-xs text-white/40 pt-2 border-t border-white/10">
-                  Version 2.0.0 • Built with care for peace of mind.
+                  Neuraliso provides self-directed breathing rhythms, acoustic audio synthesizers, and reflective journaling. It does not provide licensed therapy, medical prescriptions, or emergency intervention.
                 </p>
               </div>
             )}
 
             <div className="pt-2 flex justify-end">
               <button
+                type="button"
                 onClick={() => setActiveModal(null)}
-                className="px-6 py-2.5 rounded-full bg-[#00d4ff] text-[#0B1121] font-bold text-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                className="px-6 py-2.5 rounded-full bg-[#00d4ff] text-[#0B1121] font-bold text-sm hover:scale-105 active:scale-95 transition-all cursor-pointer min-h-[44px]"
               >
                 Got it
               </button>

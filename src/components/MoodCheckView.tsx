@@ -116,28 +116,35 @@ export const MoodCheckView: React.FC = () => {
           <form onSubmit={handleSave} className="space-y-8">
             {/* 1. Emoji Faces */}
             <div className="space-y-4">
-              <label className="text-sm font-bold text-white block">
+              <label id="mood-selector-label" className="text-sm font-bold text-white block">
                 1. How are you feeling right now?
               </label>
-              <div className="grid grid-cols-5 gap-2 sm:gap-4">
+              <div 
+                role="radiogroup" 
+                aria-labelledby="mood-selector-label"
+                className="grid grid-cols-5 gap-2 sm:gap-4"
+              >
                 {emojis.map((item) => {
                   const isSelected = selectedScore === item.score;
                   return (
                     <button
                       type="button"
                       key={item.score}
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={`${item.label} mood, rating ${item.score} of 5`}
                       onClick={() => {
                         sounds.playClick();
                         setSelectedScore(item.score);
                       }}
-                      className={`flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl transition-all duration-300 cursor-pointer ${
+                      className={`flex flex-col items-center justify-center gap-2 p-3 sm:p-4 rounded-2xl transition-all duration-300 cursor-pointer min-h-[56px] min-w-[44px] ${
                         isSelected
-                          ? "bg-amber-500/20 border-2 border-amber-400 scale-105 shadow-lg shadow-amber-500/20"
-                          : "bg-white/5 border border-white/10 hover:bg-white/10 hover:scale-102"
+                          ? "bg-amber-500/20 border-2 border-amber-400 scale-105 shadow-lg shadow-amber-500/20 text-white"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10 hover:scale-102 text-white/80"
                       }`}
                     >
-                      <span className="text-3xl sm:text-4xl block">{item.emoji}</span>
-                      <span className="text-xs font-semibold text-white/90">{item.label}</span>
+                      <span className="text-3xl sm:text-4xl block" aria-hidden="true">{item.emoji}</span>
+                      <span className="text-xs font-semibold">{item.label}</span>
                     </button>
                   );
                 })}

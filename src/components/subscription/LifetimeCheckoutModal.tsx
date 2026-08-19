@@ -332,7 +332,7 @@ export const LifetimeCheckoutModal: React.FC = () => {
                 ) : (
                   <>
                     <Crown className="w-5 h-5 fill-current" />
-                    <span>Pay $20.92 &amp; Get Lifetime Access</span>
+                    <span>Pay ₹2,000 &amp; Get Lifetime Access</span>
                   </>
                 )}
               </button>

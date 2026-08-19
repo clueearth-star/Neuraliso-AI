@@ -91,12 +91,12 @@ export const LifetimeDealBanner: React.FC = () => {
                   <Crown className="w-3.5 h-3.5 inline text-[#0B1121]" />
                   <span>Plus Lifetime</span>
                 </span>
-                <span>Forever for <strong className="font-black text-sm sm:text-base bg-white/40 px-1.5 py-0.5 rounded-md">$20.92</strong></span>
+                <span>Special Offer for <strong className="font-black text-sm sm:text-base bg-white/40 px-1.5 py-0.5 rounded-md">₹2,000</strong></span>
               </div>
 
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-950/90 bg-amber-200/50 px-2 py-0.5 rounded-full border border-amber-800/20 animate-pulse">
                 <Sparkles className="w-3 h-3" />
-                <span>Limited spots available</span>
+                <span>Special Offer Link</span>
               </span>
             </div>
 
@@ -107,7 +107,7 @@ export const LifetimeDealBanner: React.FC = () => {
                 onClick={handleClaim}
                 className="bg-white text-amber-950 hover:bg-amber-50 font-extrabold text-xs sm:text-sm rounded-full px-4 sm:px-6 py-1.5 sm:py-2 shadow-lg shadow-black/15 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center gap-1.5 border border-amber-200"
               >
-                <span>Claim Now</span>
+                <span>Claim Offer (₹2,000)</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
@@ -130,12 +130,12 @@ export const LifetimeDealBanner: React.FC = () => {
           id="floating-lifetime-deal-pill"
           onClick={handleClaim}
           className="fixed bottom-5 left-5 z-40 px-4 py-2 rounded-full bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#FFD700] text-[#0B1121] font-extrabold text-xs sm:text-sm shadow-xl shadow-[#FFD700]/30 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer flex items-center gap-2 border border-amber-200/50 animate-pulse"
-          title="Neuraliso Plus Lifetime Deal - $20.92"
+          title="Neuraliso Plus Lifetime Special Offer - ₹2,000"
         >
           <Crown className="w-4 h-4 text-[#0B1121]" />
-          <span>Lifetime $20.92</span>
+          <span>Special Offer ₹2,000</span>
           <span className="px-1.5 py-0.2 rounded-full bg-[#0B1121] text-[#FFD700] text-[10px] font-bold">
-            65% OFF
+            LIFETIME
           </span>
         </button>
       )}

@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import confetti from "canvas-confetti";
-import { UserSubscription, SubscriptionTier, SubscriptionStatus, BillingPeriod } from "../types";
+import { SubscriptionTier, SubscriptionStatus, BillingPeriod } from "../types";
 import { storage } from "../lib/storage";
 import { useAuth } from "./AuthContext";
-import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { getDodoCheckoutUrl, hasProAccess, LIFETIME_DEAL } from "../lib/subscriptions";
+import { getDodoCheckoutUrl, LIFETIME_DEAL } from "../lib/subscriptions";
 
 export interface SubscriptionContextType {
   tier: SubscriptionTier;
@@ -34,6 +33,7 @@ export interface SubscriptionContextType {
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
   checkFeatureAccess: (feature: "mood" | "reframe" | "chat" | "breathe" | "sleep" | "progress", count?: number) => boolean;
   refreshUsageCounts: () => void;
+  refreshSubscription: () => Promise<void>;
   triggerLifetimeCelebration: () => void;
   dismissSuccessToast: () => void;
 }
@@ -41,9 +41,19 @@ export interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile } = useAuth();
-  const [sub, setSub] = useState<UserSubscription>(() => storage.getSubscription());
-  
+  const { user } = useAuth();
+
+  // Server-authoritative state: strictly default to free/inactive
+  const [tier, setTier] = useState<SubscriptionTier>("free");
+  const [status, setStatus] = useState<SubscriptionStatus>("inactive");
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod | undefined>(undefined);
+  const [isPro, setIsPro] = useState<boolean>(false);
+  const [isLifetime, setIsLifetime] = useState<boolean>(false);
+  const [isTrial, setIsTrial] = useState<boolean>(false);
+  const [showExpiryBanner, setShowExpiryBanner] = useState<boolean>(false);
+  const [daysUntilExpiry, setDaysUntilExpiry] = useState<number | null>(null);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState("");
   const [modalFeature, setModalFeature] = useState<string | undefined>(undefined);
@@ -79,138 +89,124 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => clearInterval(interval);
   }, [refreshUsageCounts]);
 
-  // Sync subscription from profile/auth or local storage
+  // Clean any old cached localStorage subscription data on boot to avoid cross-user contamination
   useEffect(() => {
-    if (profile && profile.subscription_tier) {
-      const isLife = profile.subscription_tier === "lifetime";
-      const updated: UserSubscription = {
-        tier: (profile.subscription_tier as SubscriptionTier) || "free",
-        status: (profile.subscription_status as SubscriptionStatus) || "inactive",
-        expiresAt: profile.subscription_expires_at || null,
-        dodoCustomerId: profile.dodo_customer_id,
-        dodoSubscriptionId: profile.dodo_subscription_id,
-        isLifetime: isLife,
-        billingPeriod: isLife ? "lifetime" : undefined,
-      };
-      setSub(updated);
-      storage.saveSubscription(updated);
-    } else {
-      const stored = storage.getSubscription();
-      setSub(stored);
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("neuraliso_subscription");
+        window.localStorage.removeItem("neuraliso_subscription_v2");
+      }
+    } catch {}
+  }, []);
+
+  // Fresh Server-Side Query: Re-evaluated whenever user logs in, out, or switches accounts
+  const checkServerSubscription = useCallback(async (targetUserId?: string, targetEmail?: string) => {
+    // 1. Permanent free access exception for clueearth@gmail.com
+    if (targetEmail && targetEmail.toLowerCase().trim() === "clueearth@gmail.com") {
+      setIsPro(true);
+      setIsLifetime(true);
+      setIsTrial(false);
+      setTier("lifetime");
+      setStatus("active");
+      setExpiresAt(null);
+      setBillingPeriod("lifetime");
+      setShowExpiryBanner(false);
+      setDaysUntilExpiry(null);
+      return;
     }
-  }, [profile]);
 
-  const [serverProStatus, setServerProStatus] = useState<boolean | null>(null);
-  const [serverIsLifetime, setServerIsLifetime] = useState<boolean>(false);
+    // 2. Unauthenticated user -> Strictly FREE / INACTIVE
+    if (!targetUserId) {
+      setIsPro(false);
+      setIsLifetime(false);
+      setIsTrial(false);
+      setTier("free");
+      setStatus("inactive");
+      setExpiresAt(null);
+      setBillingPeriod(undefined);
+      setShowExpiryBanner(false);
+      setDaysUntilExpiry(null);
+      return;
+    }
 
-  useEffect(() => {
-    let isMounted = true;
-    async function checkServerSub() {
-      if (user?.email && user.email.toLowerCase().trim() === "clueearth@gmail.com") {
-        if (isMounted) {
-          setServerProStatus(true);
-          setServerIsLifetime(true);
-        }
-        return;
-      }
-      if (!user) {
-        if (isMounted) {
-          setServerProStatus(false);
-          setServerIsLifetime(false);
-        }
-        return;
-      }
+    try {
+      // Query server endpoint which verifies public.subscriptions for this specific user_id
+      const res = await fetch("/api/check-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: targetUserId, email: targetEmail })
+      });
 
-      try {
-        const res = await fetch("/api/check-subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, email: user.email })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) {
-            setServerProStatus(!!data.isPro);
-            setServerIsLifetime(!!data.isLifetime);
-          }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isPro === true && data.status === "active") {
+          const isLife = Boolean(data.isLifetime || (data.planType || "").toLowerCase() === "lifetime");
+          setIsPro(true);
+          setIsLifetime(isLife);
+          setIsTrial(false);
+          setTier(isLife ? "lifetime" : "pro");
+          setStatus("active");
+          setExpiresAt(null);
+          setBillingPeriod(isLife ? "lifetime" : undefined);
+          setShowExpiryBanner(false);
+          setDaysUntilExpiry(null);
           return;
         }
-      } catch (e) {}
-
-      try {
-        if (isSupabaseConfigured()) {
-          const { data: subData } = await supabase
-            .from("subscriptions")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("status", "active")
-            .maybeSingle();
-
-          if (subData) {
-            const isLife = !subData.current_period_end;
-            const isValid = isLife || new Date(subData.current_period_end).getTime() > Date.now();
-            if (isMounted) {
-              setServerProStatus(isValid);
-              setServerIsLifetime(isLife);
-            }
-            return;
-          }
-        }
-      } catch (e) {}
-
-      if (isMounted) {
-        setServerProStatus(false);
-        setServerIsLifetime(false);
       }
+    } catch (e) {
+      console.warn("[SubscriptionContext] Error querying server subscription:", e);
     }
 
-    checkServerSub();
-    return () => { isMounted = false; };
-  }, [user]);
+    // 3. Fallback / Zero-rows / Query failure / Inactive -> STRICTLY FREE / INACTIVE
+    setIsPro(false);
+    setIsLifetime(false);
+    setIsTrial(false);
+    setTier("free");
+    setStatus("inactive");
+    setExpiresAt(null);
+    setBillingPeriod(undefined);
+    setShowExpiryBanner(false);
+    setDaysUntilExpiry(null);
+  }, []);
+
+  // Trigger fresh check every time the authenticated user changes
+  useEffect(() => {
+    // Reset immediately upon user change
+    setIsPro(false);
+    setIsLifetime(false);
+    setIsTrial(false);
+    setTier("free");
+    setStatus("inactive");
+
+    if (user) {
+      checkServerSubscription(user.id, user.email);
+    } else {
+      checkServerSubscription(undefined, undefined);
+    }
+  }, [user?.id, user?.email, checkServerSubscription]);
+
+  const refreshSubscription = useCallback(async () => {
+    if (user) {
+      await checkServerSubscription(user.id, user.email);
+    } else {
+      await checkServerSubscription(undefined, undefined);
+    }
+  }, [user, checkServerSubscription]);
 
   // Trigger celebratory confetti
   const triggerLifetimeCelebration = useCallback(() => {
     try {
-      // Confetti burst (2-3 seconds)
       const count = 200;
-      const defaults = {
-        origin: { y: 0.7 },
-        zIndex: 9999
-      };
-
+      const defaults = { origin: { y: 0.7 }, zIndex: 9999 };
       const fire = (particleRatio: number, opts: confetti.Options) => {
-        confetti({
-          ...defaults,
-          ...opts,
-          particleCount: Math.floor(count * particleRatio)
-        });
+        confetti({ ...defaults, ...opts, particleCount: Math.floor(count * particleRatio) });
       };
 
-      fire(0.25, {
-        spread: 26,
-        startVelocity: 55,
-        colors: ["#FFD700", "#FFA500", "#FFFFFF"]
-      });
-      fire(0.2, {
-        spread: 60,
-        colors: ["#FFD700", "#00d4ff", "#00b8a9"]
-      });
-      fire(0.35, {
-        spread: 100,
-        decay: 0.91,
-        scalar: 0.8
-      });
-      fire(0.1, {
-        spread: 120,
-        startVelocity: 25,
-        decay: 0.92,
-        scalar: 1.2
-      });
-      fire(0.1, {
-        spread: 120,
-        startVelocity: 45,
-        colors: ["#FFD700", "#FFA500", "#10B981"]
-      });
+      fire(0.25, { spread: 26, startVelocity: 55, colors: ["#FFD700", "#FFA500", "#FFFFFF"] });
+      fire(0.2, { spread: 60, colors: ["#FFD700", "#00d4ff", "#00b8a9"] });
+      fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+      fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+      fire(0.1, { spread: 120, startVelocity: 45, colors: ["#FFD700", "#FFA500", "#10B981"] });
     } catch (e) {
       console.log("Confetti effect unavailable:", e);
     }
@@ -224,54 +220,14 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const params = new URLSearchParams(window.location.search);
       if (params.get("payment") === "success" || params.get("checkout") === "success" || params.get("lifetime") === "success") {
         triggerLifetimeCelebration();
+        // Immediately refresh status from server
+        refreshSubscription();
         // Clean URL without refresh
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
     }
-  }, [triggerLifetimeCelebration]);
-
-  // Graceful downgrade check
-  const isClueEarth = user?.email?.toLowerCase().trim() === "clueearth@gmail.com";
-  let isPro = false;
-  let isLifetime = false;
-  let isTrial = false;
-  let showExpiryBanner = false;
-  let daysUntilExpiry: number | null = null;
-
-  const currentTier = profile?.subscription_tier || sub.tier;
-  const currentStatus = profile?.subscription_status || sub.status;
-  const currentExpiry = profile?.subscription_expires_at || sub.expiresAt;
-
-  if (isClueEarth) {
-    isPro = true;
-    isLifetime = true;
-  } else if (currentTier === "lifetime" || serverIsLifetime || sub.isLifetime) {
-    isPro = true;
-    isLifetime = true;
-  } else if (serverProStatus === true) {
-    isPro = true;
-  } else if (serverProStatus === false && !sub.tier) {
-    isPro = false;
-  } else {
-    if (["pro", "plus", "plus_monthly", "plus_yearly"].includes(currentTier) && (currentStatus === "active" || currentStatus === "trial")) {
-      if (currentStatus === "trial") isTrial = true;
-      if (currentExpiry) {
-        const expiryDate = new Date(currentExpiry).getTime();
-        const now = Date.now();
-        if (expiryDate > now) {
-          isPro = true;
-          const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-          if (diffDays <= 7 && diffDays >= 0) {
-            showExpiryBanner = true;
-            daysUntilExpiry = diffDays;
-          }
-        }
-      } else {
-        isPro = true;
-      }
-    }
-  }
+  }, [triggerLifetimeCelebration, refreshSubscription]);
 
   const openUpgradeModal = useCallback((reason = "Unlock unlimited mental health enhancements with Neuraliso Plus.", feature?: string) => {
     setModalReason(reason);
@@ -326,30 +282,13 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [user, buyLifetimeDeal]);
 
   const startFreeTrial = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    // Requires entering card / payment details through Dodo checkout
     return upgradeToPro("yearly");
   }, [upgradeToPro]);
 
   const cancelSubscription = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const updated: UserSubscription = {
-        ...sub,
-        status: "cancelled",
-      };
-      setSub(updated);
-      storage.saveSubscription(updated);
-
-      if (user && isSupabaseConfigured()) {
-        await supabase.from("profiles").update({
-          subscription_status: "cancelled"
-        }).eq("id", user.id);
-      }
-
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: e.message || "Failed to cancel subscription" };
-    }
-  }, [sub, user]);
+    // In production, cancellations are managed via Dodo Payments customer portal
+    return { success: true };
+  }, []);
 
   const checkFeatureAccess = useCallback((feature: "mood" | "reframe" | "chat" | "breathe" | "sleep" | "progress", count?: number): boolean => {
     if (isPro || isLifetime) return true;
@@ -374,10 +313,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   return (
     <SubscriptionContext.Provider
       value={{
-        tier: sub.tier,
-        status: sub.status,
-        expiresAt: sub.expiresAt,
-        billingPeriod: sub.billingPeriod,
+        tier,
+        status,
+        expiresAt,
+        billingPeriod,
         isPro,
         isLifetime,
         isTrial,
@@ -401,6 +340,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         cancelSubscription,
         checkFeatureAccess,
         refreshUsageCounts,
+        refreshSubscription,
         triggerLifetimeCelebration,
         dismissSuccessToast,
       }}

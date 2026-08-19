@@ -136,19 +136,25 @@ export const storage = {
 
   getSubscription(): UserSubscription {
     try {
-      const data = localStorage.getItem(SUBSCRIPTION_KEY);
-      return data ? { ...DEFAULT_SUBSCRIPTION, ...JSON.parse(data) } : DEFAULT_SUBSCRIPTION;
-    } catch {
-      return DEFAULT_SUBSCRIPTION;
-    }
+      if (typeof window !== "undefined") {
+        safeStorage.removeItem(SUBSCRIPTION_KEY);
+        safeStorage.removeItem("neuraliso_subscription");
+        safeStorage.removeItem("neuraliso_subscription_v2");
+      }
+    } catch {}
+    return DEFAULT_SUBSCRIPTION;
   },
 
-  saveSubscription(sub: UserSubscription): void {
+  saveSubscription(_sub: UserSubscription): void {
+    // Subscription status is strictly server-authoritative and queried from public.subscriptions.
+    // Client-side subscription caching is disabled to prevent cross-account access leakage.
     try {
-      localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(sub));
-    } catch (e) {
-      console.error("Failed to save subscription", e);
-    }
+      if (typeof window !== "undefined") {
+        safeStorage.removeItem(SUBSCRIPTION_KEY);
+        safeStorage.removeItem("neuraliso_subscription");
+        safeStorage.removeItem("neuraliso_subscription_v2");
+      }
+    } catch {}
   },
 
   getOnboarding(): OnboardingState {

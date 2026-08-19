@@ -291,11 +291,11 @@ export const Pricing: React.FC<PricingProps> = ({ embedded = false }) => {
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1 text-[#FFD700] text-xs font-bold uppercase tracking-wider">
               <Crown className="w-4 h-4" />
-              <span>Lifetime Member Option</span>
+              <span>Special Lifetime Offer</span>
             </div>
             <h4 className="text-xl font-bold text-white">Want permanent access to all current &amp; future tools?</h4>
             <p className="text-xs sm:text-sm text-slate-300">
-              Get the Neuraliso Plus Lifetime Deal for a single one-time payment of $20.92 (never any subscriptions).
+              Get the Neuraliso Plus Lifetime Deal for a single one-time payment of ₹2,000 (never any subscriptions).
             </p>
           </div>
           <button
@@ -304,7 +304,7 @@ export const Pricing: React.FC<PricingProps> = ({ embedded = false }) => {
             className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#ffe244] text-[#0B1121] font-bold text-sm shrink-0 shadow-lg cursor-pointer min-h-[44px] flex items-center gap-1.5"
           >
             <Crown className="w-4 h-4" />
-            <span>Lifetime Deal ($20.92)</span>
+            <span>Special Offer (₹2,000)</span>
           </button>
         </div>
 

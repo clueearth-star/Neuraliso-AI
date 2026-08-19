@@ -32,6 +32,7 @@ export interface AppSettings {
   reminderTime: string; // e.g. "20:00"
   notifications: boolean;
   soundEnabled: boolean;
+  reminderMessage?: string;
 }
 
 export interface OnboardingState {
@@ -40,11 +41,49 @@ export interface OnboardingState {
   goal: "calm" | "sleep" | "focus" | "explore" | "";
 }
 
+export type HabitFrequency = "daily" | "weekdays" | "weekends" | "weekly";
+
+export type HabitCategory = 
+  | "mindfulness" 
+  | "physical" 
+  | "hydration" 
+  | "sleep" 
+  | "nutrition" 
+  | "focus" 
+  | "gratitude" 
+  | "custom";
+
+export interface Habit {
+  id: string;
+  title: string;
+  description?: string;
+  category: HabitCategory;
+  emoji: string;
+  targetPerDay: number; // e.g. 1 or 8
+  unit: string; // e.g. "times", "glasses", "min", "pages"
+  frequency: HabitFrequency;
+  color: string; // hex or theme accent e.g. "#00d4ff"
+  createdAt: number;
+  completedDates: Record<string, number>; // date "YYYY-MM-DD" -> count completed
+  currentStreak: number;
+  bestStreak: number;
+  archived?: boolean;
+}
+
+export interface HabitCompletionStats {
+  totalHabits: number;
+  completedToday: number;
+  completionRateToday: number; // 0 to 100
+  totalCompletionsAllTime: number;
+  longestStreakEver: number;
+  activeStreakCount: number;
+}
+
 export interface ActivityLog {
   id: string;
   date: string;
   timestamp: number;
-  type: "mood" | "breathe" | "sleep" | "reframe";
+  type: "mood" | "breathe" | "sleep" | "reframe" | "habit";
   title: string;
   description: string;
 }

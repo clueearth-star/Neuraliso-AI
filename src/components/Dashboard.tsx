@@ -12,7 +12,10 @@ import {
   Clock,
   Sparkles,
   Bot,
-  MessageCircle
+  MessageCircle,
+  Target,
+  Check,
+  Plus
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -24,7 +27,7 @@ import {
 } from "recharts";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
-import { ActivityLog } from "../types";
+import { ActivityLog, Habit, HabitCompletionStats } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 
 export const Dashboard: React.FC = () => {
@@ -36,17 +39,41 @@ export const Dashboard: React.FC = () => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestMood, setLatestMood] = useState(storage.getMoods()[0]);
   const [selectedQuickMood, setSelectedQuickMood] = useState<number | null>(null);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitStats, setHabitStats] = useState<HabitCompletionStats>({
+    totalHabits: 0,
+    completedToday: 0,
+    completionRateToday: 0,
+    totalCompletionsAllTime: 0,
+    longestStreakEver: 0,
+    activeStreakCount: 0,
+  });
+
+  const todayStr = new Date().toISOString().split("T")[0];
 
   const reloadData = () => {
     setStreak(storage.getStreak());
     setActivities(storage.getActivities().slice(0, 5));
     setChartData(storage.getWeeklyMoodChart());
     setLatestMood(storage.getMoods()[0]);
+    setHabits(storage.getHabits());
+    setHabitStats(storage.getHabitStats());
   };
 
   useEffect(() => {
     reloadData();
   }, []);
+
+  const handleQuickHabitToggle = (habit: Habit, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { isComplete } = storage.toggleHabitStep(habit.id, todayStr, 1);
+    if (isComplete) {
+      sounds.playSuccess();
+    } else {
+      sounds.playBloop();
+    }
+    reloadData();
+  };
 
   const emojis = [
     { score: 1, emoji: "😢", label: "Sad" },
@@ -203,6 +230,98 @@ export const Dashboard: React.FC = () => {
           <MessageCircle className="w-4 h-4 fill-current" />
           <span>Open AI Coach</span>
           <ArrowRight className="w-4 h-4" />
+        </div>
+      </div>
+
+      {/* Daily Habits & Streaks Widget */}
+      <div className="wellness-card p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-white font-serif flex items-center gap-2">
+                <Target className="w-5 h-5 text-[#00d4ff]" />
+                <span>Today's Habits &amp; Rituals</span>
+              </h2>
+              {habitStats.activeStreakCount > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{habitStats.activeStreakCount} Streaks</span>
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-white/60">
+              {habitStats.completedToday} of {habitStats.totalHabits} rituals completed today ({habitStats.completionRateToday}%)
+            </p>
+          </div>
+
+          <Link
+            to="/app/habits"
+            onClick={() => sounds.playClick()}
+            className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer self-stretch sm:self-auto justify-center"
+          >
+            <span>Manage All Habits &amp; Heatmaps</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#00d4ff]" />
+          </Link>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-[#00d4ff] to-emerald-400 rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(100, habitStats.completionRateToday)}%` }}
+          />
+        </div>
+
+        {/* Habits Quick Checklist */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {habits.slice(0, 6).map((habit) => {
+            const count = habit.completedDates[todayStr] || 0;
+            const isDone = count >= habit.targetPerDay;
+
+            return (
+              <div
+                key={habit.id}
+                onClick={(e) => handleQuickHabitToggle(habit, e)}
+                className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 group ${
+                  isDone
+                    ? "bg-emerald-950/20 border-emerald-500/30"
+                    : "bg-black/20 border-white/10 hover:border-white/20 hover:bg-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border border-white/10"
+                    style={{ backgroundColor: `${habit.color}15` }}
+                  >
+                    {habit.emoji}
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <h4 className="text-sm font-bold text-white truncate font-serif">{habit.title}</h4>
+                    <div className="flex items-center gap-2 text-[11px] text-white/50 font-mono">
+                      <span>{count}/{habit.targetPerDay} {habit.unit}</span>
+                      {habit.currentStreak > 0 && (
+                        <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                          <Flame className="w-3 h-3" />
+                          <span>{habit.currentStreak}d</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                    isDone
+                      ? "bg-emerald-500 text-[#0B1121] shadow-md shadow-emerald-500/20"
+                      : "bg-white/5 border border-white/15 text-white/40 group-hover:border-white/30 group-hover:text-white"
+                  }`}
+                >
+                  <Check className={`w-4 h-4 stroke-[3] ${isDone ? "text-[#0B1121]" : "opacity-40"}`} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 

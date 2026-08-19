@@ -1,8 +1,9 @@
-const CACHE_NAME = "neuraliso-pwa-v4";
+const CACHE_NAME = "neuraliso-pwa-v5";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
-  "/manifest.json"
+  "/manifest.json",
+  "/icon.svg"
 ];
 
 // Install Event: Cache essential shell assets and skip waiting immediately
@@ -32,11 +33,69 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Message Listener: Allow client UI to trigger skipWaiting
+// Message Listener: Allow client UI to trigger skipWaiting or display notifications
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+  if (!event.data) return;
+
+  if (event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
+
+  if (event.data.type === "SHOW_NOTIFICATION") {
+    const { title, options } = event.data;
+    const notificationOptions = {
+      body: options?.body || "Take a mindful pause. How are you feeling today?",
+      icon: options?.icon || "/icon.svg",
+      badge: options?.badge || "/icon.svg",
+      tag: options?.tag || "neuraliso-mood-reminder",
+      renotify: true,
+      requireInteraction: options?.requireInteraction ?? false,
+      data: {
+        url: options?.url || "/app/mood",
+        timestamp: Date.now(),
+        ...(options?.data || {}),
+      },
+      actions: [
+        { action: "checkin", title: "✨ Check In Now" },
+        { action: "dismiss", title: "Later" }
+      ],
+      ...(options || {})
+    };
+
+    self.registration.showNotification(title || "Daily Mood Check-in 🌿", notificationOptions);
+  }
+});
+
+// Notification Click Handler: Focus existing tab or open /app/mood
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "dismiss") {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || "/app/mood";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If a Neuraliso tab is already open, focus it and navigate
+      for (const client of clientList) {
+        if (client.url && "focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      // If no tab is open, open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+// Notification Close Handler
+self.addEventListener("notificationclose", (event) => {
+  console.log("[SW] Notification closed:", event.notification.tag);
 });
 
 // Fetch Event: Network-First Strategy for HTML, JS, CSS, and App Shell

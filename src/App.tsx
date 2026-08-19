@@ -14,6 +14,7 @@ import { ProgressView } from "./components/ProgressView";
 import { SettingsView } from "./components/SettingsView";
 import { ChatView } from "./components/ChatView";
 import { InsightsView } from "./components/InsightsView";
+import { HabitsView } from "./components/HabitsView";
 import { FloatingChatButton } from "./components/FloatingChatButton";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./components/auth/Login";
@@ -30,6 +31,7 @@ import { useSubscription } from "./contexts/SubscriptionContext";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
+import { reminderScheduler } from "./lib/notifications";
 
 const AppLayout: React.FC = () => {
   const { showExpiryBanner, daysUntilExpiry, openUpgradeModal } = useSubscription();
@@ -64,6 +66,9 @@ export function App() {
       const splash = document.getElementById("splash");
       if (splash) splash.remove();
     }
+
+    // Start background local storage-backed reminder scheduler
+    reminderScheduler.start();
   }, []);
 
   return (
@@ -95,6 +100,7 @@ export function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="mood" element={<MoodCheckView />} />
                 <Route path="insights" element={<InsightsView />} />
+                <Route path="habits" element={<HabitsView />} />
                 <Route path="breathe" element={<BreatheView />} />
                 <Route path="sleep" element={<SleepSoundsView />} />
                 <Route path="reframe" element={<ReframeView />} />

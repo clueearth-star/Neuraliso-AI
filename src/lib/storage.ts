@@ -1,4 +1,15 @@
-import { MoodEntry, ReframeEntry, AppSettings, OnboardingState, ActivityLog, ChatMessage, CrisisLog, UserSubscription } from "../types";
+import { 
+  MoodEntry, 
+  ReframeEntry, 
+  AppSettings, 
+  OnboardingState, 
+  ActivityLog, 
+  ChatMessage, 
+  CrisisLog, 
+  UserSubscription,
+  Habit,
+  HabitCompletionStats
+} from "../types";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { safeStorage } from "./safeStorage";
 
@@ -13,6 +24,85 @@ const ACTIVITIES_KEY = "neuraliso_activities_v2";
 const CHAT_KEY = "neuraliso_chat_history";
 const CRISIS_LOG_KEY = "neuraliso_crisis_logs";
 const SUBSCRIPTION_KEY = "neuraliso_subscription_v2";
+const HABITS_KEY = "neuraliso_habits_v2";
+
+const DEFAULT_HABITS: Habit[] = [
+  {
+    id: "habit_hydrate",
+    title: "Daily Hydration",
+    description: "Drink at least 6-8 glasses of water to maintain mental clarity and physical calm",
+    category: "hydration",
+    emoji: "💧",
+    targetPerDay: 8,
+    unit: "glasses",
+    frequency: "daily",
+    color: "#00d4ff",
+    createdAt: Date.now() - 86400000 * 2,
+    completedDates: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  },
+  {
+    id: "habit_breathe",
+    title: "Mindful Breathing",
+    description: "Take 3 to 5 minutes for box breathing or diaphragmatic grounding",
+    category: "mindfulness",
+    emoji: "🌿",
+    targetPerDay: 1,
+    unit: "session",
+    frequency: "daily",
+    color: "#10b981",
+    createdAt: Date.now() - 86400000 * 2,
+    completedDates: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  },
+  {
+    id: "habit_walk",
+    title: "Gentle Movement / Walk",
+    description: "15 minutes of outdoor walking or body stretching to release muscular tension",
+    category: "physical",
+    emoji: "🚶",
+    targetPerDay: 1,
+    unit: "walk",
+    frequency: "daily",
+    color: "#f59e0b",
+    createdAt: Date.now() - 86400000 * 2,
+    completedDates: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  },
+  {
+    id: "habit_gratitude",
+    title: "Gratitude Reflection",
+    description: "Acknowledge one person, moment, or comfort you are thankful for today",
+    category: "gratitude",
+    emoji: "✨",
+    targetPerDay: 1,
+    unit: "note",
+    frequency: "daily",
+    color: "#a855f7",
+    createdAt: Date.now() - 86400000 * 2,
+    completedDates: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  },
+  {
+    id: "habit_sleep_hygiene",
+    title: "Digital Sunset",
+    description: "Power down screens 30 minutes before sleep with calming ambient sound",
+    category: "sleep",
+    emoji: "🌙",
+    targetPerDay: 1,
+    unit: "routine",
+    frequency: "daily",
+    color: "#6366f1",
+    createdAt: Date.now() - 86400000 * 2,
+    completedDates: {},
+    currentStreak: 0,
+    bestStreak: 0,
+  },
+];
 
 const DEFAULT_SUBSCRIPTION: UserSubscription = {
   tier: "free",
@@ -295,6 +385,269 @@ export const storage = {
     return days;
   },
 
+  getHabits(): Habit[] {
+    try {
+      const data = localStorage.getItem(HABITS_KEY);
+      if (!data) {
+        // Initialize default habits
+        localStorage.setItem(HABITS_KEY, JSON.stringify(DEFAULT_HABITS));
+        return DEFAULT_HABITS;
+      }
+      const parsed: Habit[] = JSON.parse(data);
+      // Re-calculate live streaks on retrieval
+      return parsed.map((h) => {
+        const { currentStreak, bestStreak } = this.calculateHabitStreak(h.completedDates || {}, h.targetPerDay);
+        return {
+          ...h,
+          currentStreak,
+          bestStreak: Math.max(h.bestStreak || 0, bestStreak),
+        };
+      });
+    } catch {
+      return DEFAULT_HABITS;
+    }
+  },
+
+  calculateHabitStreak(completedDates: Record<string, number>, targetPerDay: number): { currentStreak: number; bestStreak: number } {
+    const target = Math.max(1, targetPerDay || 1);
+    const completedDays = Object.entries(completedDates || {})
+      .filter(([_, count]) => count >= target)
+      .map(([date]) => date)
+      .sort();
+
+    if (completedDays.length === 0) {
+      return { currentStreak: 0, bestStreak: 0 };
+    }
+
+    const dateSet = new Set(completedDays);
+
+    // Calculate Best Streak
+    let best = 0;
+    let running = 0;
+    let prevMs = 0;
+
+    for (const dStr of completedDays) {
+      const ms = new Date(dStr + "T00:00:00").getTime();
+      if (prevMs === 0) {
+        running = 1;
+      } else {
+        const diffDays = Math.round((ms - prevMs) / 86400000);
+        if (diffDays === 1) {
+          running++;
+        } else if (diffDays > 1) {
+          running = 1;
+        }
+      }
+      prevMs = ms;
+      if (running > best) best = running;
+    }
+
+    // Calculate Current Streak
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const yesterday = new Date(now.getTime() - 86400000);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    let current = 0;
+    let cursor = new Date(now);
+
+    if (dateSet.has(todayStr)) {
+      current = 1;
+      cursor.setDate(cursor.getDate() - 1);
+    } else if (dateSet.has(yesterdayStr)) {
+      // Streak still active from yesterday, waiting for today's check
+      current = 1;
+      cursor.setDate(cursor.getDate() - 2);
+    } else {
+      return { currentStreak: 0, bestStreak: best };
+    }
+
+    while (true) {
+      const cursorStr = cursor.toISOString().split("T")[0];
+      if (dateSet.has(cursorStr)) {
+        current++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return {
+      currentStreak: current,
+      bestStreak: Math.max(best, current),
+    };
+  },
+
+  saveHabit(habitData: Omit<Habit, "id" | "createdAt" | "currentStreak" | "bestStreak" | "completedDates">): Habit {
+    const habits = this.getHabits();
+    const newHabit: Habit = {
+      ...habitData,
+      id: `habit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: Date.now(),
+      completedDates: {},
+      currentStreak: 0,
+      bestStreak: 0,
+    };
+    const updated = [newHabit, ...habits];
+    try {
+      localStorage.setItem(HABITS_KEY, JSON.stringify(updated));
+      this.logActivity("habit", `Created Habit: ${newHabit.emoji} ${newHabit.title}`, `Goal: ${newHabit.targetPerDay} ${newHabit.unit} daily`);
+    } catch (e) {
+      console.error("Failed to save habit", e);
+    }
+    return newHabit;
+  },
+
+  updateHabit(updated: Habit): void {
+    const habits = this.getHabits();
+    const next = habits.map((h) => (h.id === updated.id ? updated : h));
+    try {
+      localStorage.setItem(HABITS_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to update habit", e);
+    }
+  },
+
+  deleteHabit(id: string): void {
+    const habits = this.getHabits();
+    const next = habits.filter((h) => h.id !== id);
+    try {
+      localStorage.setItem(HABITS_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.error("Failed to delete habit", e);
+    }
+  },
+
+  toggleHabitStep(id: string, dateStr?: string, delta: number = 1): { habit: Habit | null; isComplete: boolean; currentCount: number } {
+    const habits = this.getHabits();
+    const habit = habits.find((h) => h.id === id);
+    if (!habit) return { habit: null, isComplete: false, currentCount: 0 };
+
+    const targetDate = dateStr || new Date().toISOString().split("T")[0];
+    const currentCount = habit.completedDates[targetDate] || 0;
+    let nextCount = Math.max(0, currentCount + delta);
+
+    // If single target (target = 1) and delta was +1 but already complete, toggle back to 0
+    if (habit.targetPerDay === 1 && currentCount >= 1 && delta > 0) {
+      nextCount = 0;
+    }
+
+    const updatedCompletedDates = {
+      ...habit.completedDates,
+      [targetDate]: nextCount,
+    };
+
+    if (nextCount === 0) {
+      delete updatedCompletedDates[targetDate];
+    }
+
+    const { currentStreak, bestStreak } = this.calculateHabitStreak(updatedCompletedDates, habit.targetPerDay);
+
+    const updatedHabit: Habit = {
+      ...habit,
+      completedDates: updatedCompletedDates,
+      currentStreak,
+      bestStreak: Math.max(habit.bestStreak || 0, bestStreak),
+    };
+
+    this.updateHabit(updatedHabit);
+
+    const isComplete = nextCount >= habit.targetPerDay;
+    if (isComplete && currentCount < habit.targetPerDay) {
+      this.logActivity("habit", `Completed Habit: ${habit.emoji} ${habit.title}`, `${nextCount}/${habit.targetPerDay} ${habit.unit} on ${targetDate}`);
+    }
+
+    return { habit: updatedHabit, isComplete, currentCount: nextCount };
+  },
+
+  getHabitStats(): HabitCompletionStats {
+    const habits = this.getHabits();
+    const today = new Date().toISOString().split("T")[0];
+
+    const totalHabits = habits.length;
+    let completedToday = 0;
+    let totalCompletionsAllTime = 0;
+    let longestStreakEver = 0;
+    let activeStreakCount = 0;
+
+    habits.forEach((h) => {
+      const todayCount = h.completedDates[today] || 0;
+      if (todayCount >= h.targetPerDay) {
+        completedToday++;
+      }
+      if (h.currentStreak > 0) {
+        activeStreakCount++;
+      }
+      if (h.bestStreak > longestStreakEver) {
+        longestStreakEver = h.bestStreak;
+      }
+      if (h.currentStreak > longestStreakEver) {
+        longestStreakEver = h.currentStreak;
+      }
+
+      Object.values(h.completedDates || {}).forEach((count) => {
+        if (count >= h.targetPerDay) {
+          totalCompletionsAllTime++;
+        }
+      });
+    });
+
+    const completionRateToday = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+
+    return {
+      totalHabits,
+      completedToday,
+      completionRateToday,
+      totalCompletionsAllTime,
+      longestStreakEver,
+      activeStreakCount,
+    };
+  },
+
+  getHabitWeeklyMatrix(daysCount: number = 7) {
+    const habits = this.getHabits();
+    const now = new Date();
+    const matrix = [];
+
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 86400000);
+      const dateStr = d.toISOString().split("T")[0];
+      const dayName = d.toLocaleDateString("en-US", { weekday: "narrow" });
+      const dayShort = d.toLocaleDateString("en-US", { weekday: "short" });
+      const dayNum = d.getDate();
+      const isToday = i === 0;
+
+      const habitStatuses = habits.map((h) => {
+        const count = h.completedDates[dateStr] || 0;
+        return {
+          id: h.id,
+          title: h.title,
+          emoji: h.emoji,
+          color: h.color,
+          count,
+          target: h.targetPerDay,
+          completed: count >= h.targetPerDay,
+        };
+      });
+
+      const totalCompleted = habitStatuses.filter((s) => s.completed).length;
+      const rate = habits.length > 0 ? Math.round((totalCompleted / habits.length) * 100) : 0;
+
+      matrix.push({
+        date: dateStr,
+        dayName,
+        dayShort,
+        dayNum,
+        isToday,
+        totalCompleted,
+        rate,
+        habits: habitStatuses,
+      });
+    }
+
+    return matrix;
+  },
+
   exportAllDataJSON(): string {
     const data = {
       exportDate: new Date().toISOString(),
@@ -303,6 +656,7 @@ export const storage = {
       moods: this.getMoods(),
       reframes: this.getReframes(),
       activities: this.getActivities(),
+      habits: this.getHabits(),
     };
     return JSON.stringify(data, null, 2);
   },
@@ -316,6 +670,7 @@ export const storage = {
       localStorage.removeItem(ACTIVITIES_KEY);
       localStorage.removeItem(CHAT_KEY);
       localStorage.removeItem(CRISIS_LOG_KEY);
+      localStorage.removeItem(HABITS_KEY);
     } catch (e) {
       console.error("Failed to delete all data", e);
     }

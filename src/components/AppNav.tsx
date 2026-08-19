@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Target
 } from "lucide-react";
 import { sounds } from "../lib/sounds";
 import { storage } from "../lib/storage";
@@ -64,6 +65,7 @@ export const AppNav: React.FC = () => {
   const navItems = [
     { path: "/app", label: "Dashboard", icon: <Home className="w-5 h-5" /> },
     { path: "/app/chat", label: "AI Coach", icon: <MessageCircle className="w-5 h-5" /> },
+    { path: "/app/habits", label: "Habits", icon: <Target className="w-5 h-5" /> },
     { path: "/app/insights", label: "Insights", icon: <Sparkles className="w-5 h-5" /> },
     { path: "/app/mood", label: "Mood", icon: <Smile className="w-5 h-5" /> },
     { path: "/app/breathe", label: "Breathe", icon: <Wind className="w-5 h-5" /> },
@@ -287,7 +289,7 @@ export const AppNav: React.FC = () => {
       )}
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#111A2E]/95 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex items-center justify-around">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#111A2E]/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 flex items-center justify-start sm:justify-around overflow-x-auto scrollbar-none gap-1">
         {navItems.map((item) => {
           const active = location.pathname === item.path;
           return (
@@ -295,14 +297,14 @@ export const AppNav: React.FC = () => {
               key={item.path}
               to={item.path}
               onClick={() => sounds.playClick()}
-              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${
-                active ? "text-[#00d4ff] scale-110 font-bold" : "text-white/50 hover:text-white"
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all shrink-0 ${
+                active ? "text-[#00d4ff] scale-105 font-bold" : "text-white/50 hover:text-white"
               }`}
             >
               <div className={active ? "p-1 rounded-lg bg-[#00d4ff]/15" : ""}>
                 {item.icon}
               </div>
-              <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+              <span className="text-[10px] mt-0.5 tracking-tight whitespace-nowrap">{item.label}</span>
             </Link>
           );
         })}

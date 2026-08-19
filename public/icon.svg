@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="36" fill="#0B1121"/>
+  <defs>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#00b8a9"/>
+    </linearGradient>
+  </defs>
+  <!-- Lotus & Brain Outline -->
+  <g transform="translate(46, 36)" stroke="url(#cyanGrad)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M50 15 C70 15, 84 28, 87 48 C89 62, 85 75, 78 84 C73 90, 65 93, 60 96 L60 108 C60 112, 55 115, 50 115 C45 115, 40 112, 40 108 L40 96 C35 93, 27 90, 22 84 C15 75, 11 62, 13 48 C16 28, 30 15, 50 15Z"/>
+    <path d="M50 35 C58 35, 66 42, 68 54 C69 62, 65 70, 50 82 C35 70, 31 62, 32 54 C34 42, 42 35, 50 35Z" fill="#00d4ff" fill-opacity="0.2"/>
+    <circle cx="50" cy="56" r="8" fill="#00d4ff" fill-opacity="0.8"/>
+  </g>
+</svg>

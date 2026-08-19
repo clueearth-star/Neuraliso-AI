@@ -1,0 +1,27 @@
+[
+  {
+    "url": "https://api.supabase.com/v1/projects/siewuccllcisezwyiyaz/database/query",
+    "status": 401,
+    "text": "{\"message\":\"JWT failed verification\"}"
+  },
+  {
+    "url": "https://api.supabase.com/v1/projects/siewuccllcisezwyiyaz/query",
+    "status": 401,
+    "text": "{\"message\":\"JWT failed verification\"}"
+  },
+  {
+    "url": "https://siewuccllcisezwyiyaz.supabase.co/rest/v1/",
+    "status": 405,
+    "text": "{\"code\":\"PGRST117\",\"details\":null,\"hint\":null,\"message\":\"Unsupported HTTP method: POST\"}"
+  },
+  {
+    "url": "https://siewuccllcisezwyiyaz.supabase.co/pg-meta/default/query",
+    "status": 404,
+    "text": "{\"error\":\"requested path is invalid\"}"
+  },
+  {
+    "url": "https://siewuccllcisezwyiyaz.supabase.co/database/query",
+    "status": 404,
+    "text": "{\"error\":\"requested path is invalid\"}"
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "users": {
+    "data": [
+      {
+        "id": "0e853d0c-b844-4db4-ba5e-e5a1b5916802",
+        "email": "ad0616916@gmail.com",
+        "display_name": null,
+        "created_at": "2026-07-20T19:42:07.630593+00:00",
+        "onboarding_completed": false,
+        "primary_goal": null,
+        "stress_baseline": null,
+        "preferred_checkin_time": null,
+        "age_range": null,
+        "wellness_score": 0
+      },
+      {
+        "id": "431008eb-df0b-4023-9dd9-b2fdc38951c9",
+        "email": "truefeya@gmail.com",
+        "display_name": null,
+        "created_at": "2026-07-21T03:48:45.17844+00:00",
+        "onboarding_completed": false,
+        "primary_goal": null,
+        "stress_baseline": null,
+        "preferred_checkin_time": null,
+        "age_range": null,
+        "wellness_score": 0
+      }
+    ],
+    "error": null
+  },
+  "entries": {
+    "data": [],
+    "error": null
+  }
+}

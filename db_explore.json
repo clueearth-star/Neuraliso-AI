@@ -1,0 +1,80 @@
+{
+  "tables": {
+    "entries": {
+      "exists": true
+    },
+    "users": {
+      "exists": true
+    },
+    "profiles": {
+      "exists": false,
+      "error": "Could not find the table 'public.profiles' in the schema cache"
+    },
+    "moods": {
+      "exists": false,
+      "error": "Could not find the table 'public.moods' in the schema cache"
+    },
+    "thoughts": {
+      "exists": false,
+      "error": "Could not find the table 'public.thoughts' in the schema cache"
+    },
+    "subscriptions": {
+      "exists": false,
+      "error": "Could not find the table 'public.subscriptions' in the schema cache"
+    }
+  },
+  "rpcs": {
+    "exec_sql": {
+      "status": false,
+      "error": "Could not find the function public.exec_sql(query) in the schema cache",
+      "data": null
+    },
+    "execute_sql": {
+      "status": false,
+      "error": "Could not find the function public.execute_sql(query) in the schema cache",
+      "data": null
+    },
+    "run_sql": {
+      "status": false,
+      "error": "Could not find the function public.run_sql(query) in the schema cache",
+      "data": null
+    },
+    "sql": {
+      "status": false,
+      "error": "Could not find the function public.sql(query) in the schema cache",
+      "data": null
+    },
+    "exec": {
+      "status": false,
+      "error": "Could not find the function public.exec(query) in the schema cache",
+      "data": null
+    },
+    "query": {
+      "status": false,
+      "error": "Could not find the function public.query(query) in the schema cache",
+      "data": null
+    }
+  },
+  "endpoints": {
+    "/pg-meta/default/query": {
+      "status": 404,
+      "text": "{\"error\":\"requested path is invalid\"}"
+    },
+    "/pg/query": {
+      "status": 404,
+      "text": "{\"error\":\"requested path is invalid\"}"
+    },
+    "/rest/v1/rpc": {
+      "status": 404,
+      "text": "{\"code\":\"PGRST205\",\"details\":null,\"hint\":null,\"message\":\"Could not find the table 'public.rpc' in th"
+    },
+    "/admin/v1/sql": {
+      "status": 403,
+      "text": "{}"
+    },
+    "/pg-meta/query": {
+      "status": 404,
+      "text": "{\"error\":\"requested path is invalid\"}"
+    }
+  }
+}

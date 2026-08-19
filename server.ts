@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -47,7 +48,13 @@ function getSupabaseAdmin() {
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    },
+  })
+);
 
 // API routes FIRST
 app.get("/api/health", (req, res) => {
@@ -146,56 +153,152 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Helper function to check Pro status server-side from subscriptions table
-async function isUserProServerSide(userId?: string, email?: string): Promise<{ isPro: boolean; isLifetime: boolean; status: string; reason: string }> {
+// Webhook signature verification helper for Dodo Payments (Standard Webhooks / HMAC-SHA256)
+function verifyDodoWebhookSignature(
+  headers: Record<string, string | string[] | undefined>,
+  rawBody: string,
+  secret?: string
+): { isValid: boolean; reason: string } {
+  const webhookSecret = secret || process.env.DODO_WEBHOOK_SECRET || process.env.DODO_PAYMENTS_WEBHOOK_KEY;
+  if (!webhookSecret) {
+    return { isValid: false, reason: "Missing DODO_WEBHOOK_SECRET configuration on server" };
+  }
+
+  const getHeader = (name: string): string => {
+    const direct = headers[name] || headers[name.toLowerCase()];
+    if (Array.isArray(direct)) return direct[0] || "";
+    return (direct as string) || "";
+  };
+
+  const webhookId = getHeader("webhook-id") || getHeader("webhook_id") || getHeader("msg_id");
+  const webhookTimestamp = getHeader("webhook-timestamp") || getHeader("webhook_timestamp");
+  const webhookSignature = getHeader("webhook-signature") || getHeader("webhook_signature") || getHeader("x-dodo-signature") || getHeader("dodo-signature");
+
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    return { 
+      isValid: false, 
+      reason: `Missing required webhook signature headers. (webhook-id: ${Boolean(webhookId)}, webhook-timestamp: ${Boolean(webhookTimestamp)}, webhook-signature: ${Boolean(webhookSignature)})` 
+    };
+  }
+
+  const ts = parseInt(webhookTimestamp, 10);
+  const now = Math.floor(Date.now() / 1000);
+  if (isNaN(ts)) {
+    return { isValid: false, reason: "Invalid webhook timestamp integer format" };
+  }
+  // 5 minute tolerance window to prevent replay attacks
+  if (Math.abs(now - ts) > 300) {
+    return { isValid: false, reason: `Webhook timestamp expired (age: ${Math.abs(now - ts)}s, tolerance: 300s)` };
+  }
+
+  const toSign = `${webhookId}.${webhookTimestamp}.${rawBody}`;
+
+  let secretKey: Buffer | string = webhookSecret;
+  if (webhookSecret.startsWith("whsec_")) {
+    try {
+      secretKey = Buffer.from(webhookSecret.slice(6), "base64");
+    } catch {
+      secretKey = webhookSecret;
+    }
+  }
+
+  const computedSignature = crypto.createHmac("sha256", secretKey).update(toSign).digest("base64");
+  const expectedSigBuffer = Buffer.from(computedSignature);
+
+  const passedSignatures = webhookSignature.split(" ").map((s) => {
+    const trimmed = s.trim();
+    if (trimmed.startsWith("v1,") || trimmed.startsWith("v1=")) {
+      return trimmed.slice(3);
+    }
+    return trimmed;
+  });
+
+  for (const passed of passedSignatures) {
+    const passedSigBuffer = Buffer.from(passed);
+    if (
+      expectedSigBuffer.length === passedSigBuffer.length &&
+      crypto.timingSafeEqual(expectedSigBuffer, passedSigBuffer)
+    ) {
+      return { isValid: true, reason: "Signature verified" };
+    }
+  }
+
+  return { isValid: false, reason: "HMAC signature mismatch" };
+}
+
+// Helper function to check Pro status server-side strictly from subscriptions table
+async function isUserProServerSide(
+  userId?: string, 
+  email?: string
+): Promise<{ isPro: boolean; isLifetime: boolean; status: string; planType?: string; reason: string }> {
   // 1. Permanent free access exception for clueearth@gmail.com
   if (email && email.trim().toLowerCase() === "clueearth@gmail.com") {
-    return { isPro: true, isLifetime: true, status: "active", reason: "permanent_exception" };
+    return { isPro: true, isLifetime: true, status: "active", planType: "lifetime", reason: "permanent_exception" };
   }
-  if (!userId) {
-    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_user_id" };
+
+  if (!userId && !email) {
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_user_credentials" };
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
-    return { isPro: false, isLifetime: false, status: "inactive", reason: "no_database" };
+    // Database connection not available - strictly return FALSE
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "database_unavailable" };
   }
 
   try {
-    // Read profile or subscriptions table server-side
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("subscription_tier, subscription_status, subscription_expires_at")
-      .eq("id", userId)
-      .maybeSingle();
+    let targetUserId = userId;
 
-    if (profile) {
-      const tier = (profile.subscription_tier || "").toLowerCase();
-      const status = (profile.subscription_status || "").toLowerCase();
-      if (tier === "lifetime" && (status === "active" || status === "" || !status)) {
-        return { isPro: true, isLifetime: true, status: "active", reason: "lifetime_tier" };
+    // If userId not provided directly, lookup by email in users table
+    if (!targetUserId && email) {
+      const { data: userRecord, error: userErr } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (userErr || !userRecord?.id) {
+        return { isPro: false, isLifetime: false, status: "inactive", reason: "user_not_found" };
       }
+      targetUserId = userRecord.id;
     }
 
-    const { data: sub } = await supabase
+    if (!targetUserId) {
+      return { isPro: false, isLifetime: false, status: "inactive", reason: "no_valid_user_id" };
+    }
+
+    // Query subscriptions table strictly: Return TRUE only if a matching row exists with status="active"
+    const { data: sub, error: subError } = await supabase
       .from("subscriptions")
-      .select("*")
-      .eq("user_id", userId)
+      .select("id, user_id, dodo_payment_id, plan_type, status, created_at")
+      .eq("user_id", targetUserId)
       .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (sub) {
-      if (!sub.current_period_end) {
-        return { isPro: true, isLifetime: true, status: "active", reason: "lifetime_or_unlimited" };
-      }
-      if (new Date(sub.current_period_end).getTime() > Date.now()) {
-        return { isPro: true, isLifetime: false, status: "active", reason: "active_subscription" };
-      }
+    if (subError) {
+      console.warn("[SubscriptionCheck] Error querying subscriptions table:", subError.message);
+      // Query failed - strictly return FALSE, never default to granting access on error
+      return { isPro: false, isLifetime: false, status: "inactive", reason: "subscriptions_query_error" };
+    }
+
+    if (sub && sub.status === "active") {
+      const isLife = (sub.plan_type || "").toLowerCase() === "lifetime";
+      return { 
+        isPro: true, 
+        isLifetime: isLife, 
+        status: "active", 
+        planType: sub.plan_type || "lifetime", 
+        reason: isLife ? "active_lifetime_subscription" : "active_subscription" 
+      };
     }
 
     return { isPro: false, isLifetime: false, status: "inactive", reason: "no_active_subscription" };
-  } catch (e) {
-    return { isPro: false, isLifetime: false, status: "inactive", reason: "query_error" };
+  } catch (err: any) {
+    console.error("[SubscriptionCheck] Unexpected error:", err);
+    // Return FALSE on any exception
+    return { isPro: false, isLifetime: false, status: "inactive", reason: "query_exception" };
   }
 }
 
@@ -209,45 +312,48 @@ app.post("/api/check-subscription", async (req, res) => {
   }
 });
 
-// Dodo Payments Webhook Handler & Payment Verification
+// Payment Verification Endpoint
 app.post("/api/verify-payment", async (req, res) => {
   try {
-    const { userId, subscriptionId, customerId, plan = "yearly", status = "active", isTrial = false } = req.body;
+    const { userId, subscriptionId, customerId, plan = "lifetime", status = "active" } = req.body;
     
     const isLifetime = plan === "lifetime";
-    const days = plan === "monthly" ? 30 : 365;
-    const expiresAt = isLifetime ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-    const tier = isLifetime ? "lifetime" : "pro";
-    const dodoSubId = subscriptionId || `dodo_${isLifetime ? "life" : "sub"}_${Date.now()}`;
+    const dodoPaymentId = subscriptionId || `dodo_pay_${Date.now()}`;
+    const planType = isLifetime ? "lifetime" : plan;
     
     const supabase = getSupabaseAdmin();
     if (supabase && userId) {
       // 1. Record in subscriptions table
-      await supabase.from("subscriptions").upsert({
+      const { error: subErr } = await supabase.from("subscriptions").upsert({
         user_id: userId,
-        dodo_subscription_id: dodoSubId,
+        dodo_payment_id: dodoPaymentId,
+        plan_type: planType,
         status: status,
-        current_period_end: expiresAt,
         created_at: new Date().toISOString()
-      }, { onConflict: "dodo_subscription_id" });
+      }, { onConflict: "dodo_payment_id" });
 
-      // 2. Update profiles table
-      await supabase.from("profiles").update({
-        subscription_tier: tier,
-        subscription_status: status,
-        subscription_expires_at: expiresAt,
-        dodo_customer_id: customerId || `dodo_cust_${Date.now()}`,
-        dodo_subscription_id: dodoSubId,
-      }).eq("id", userId);
+      if (subErr) {
+        console.warn("[VerifyPayment] Note on subscriptions upsert:", subErr.message);
+      }
+
+      // 2. Update profiles table if present
+      try {
+        await supabase.from("profiles").update({
+          subscription_tier: isLifetime ? "lifetime" : "pro",
+          subscription_status: status,
+          dodo_customer_id: customerId || `dodo_cust_${Date.now()}`,
+          dodo_subscription_id: dodoPaymentId,
+        }).eq("id", userId);
+      } catch (e) {}
     }
     
     return res.json({
       success: true,
-      tier,
+      tier: isLifetime ? "lifetime" : "pro",
       isLifetime,
       status,
-      expiresAt,
-      isTrial
+      planType,
+      dodoPaymentId
     });
   } catch (err: any) {
     console.error("Error in /api/verify-payment:", err);
@@ -255,81 +361,160 @@ app.post("/api/verify-payment", async (req, res) => {
   }
 });
 
+// Dodo Payments Webhook Endpoint with Signature Verification
 app.post("/api/dodo-webhook", async (req, res) => {
   try {
-    const event = req.body;
-    console.log("[Dodo Webhook] Received event:", event?.type || event?.event_type, event);
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
     
-    const type = event?.type || event?.event_type || "";
+    // 1. Verify webhook signature authenticity
+    const verification = verifyDodoWebhookSignature(req.headers as any, rawBody);
+    if (!verification.isValid) {
+      console.warn("[Dodo Webhook] Unauthorized webhook request rejected:", verification.reason);
+      return res.status(401).json({ 
+        error: "Webhook signature verification failed", 
+        reason: verification.reason 
+      });
+    }
+
+    const event = req.body;
+    const type = (event?.type || event?.event_type || "").toLowerCase();
     const data = event?.data || event?.payload || event;
     
-    const customerId = data?.customer_id || data?.customerId;
-    const subscriptionId = data?.subscription_id || data?.subscriptionId || data?.payment_id || data?.id || `dodo_pay_${Date.now()}`;
-    const userId = data?.metadata?.user_id || data?.metadata?.userId || data?.user_id || data?.userId || data?.client_reference_id;
+    console.log(`[Dodo Webhook] Verified event received: ${type}`);
+
+    const dodoPaymentId = 
+      data?.payment_id || 
+      data?.id || 
+      data?.subscription_id || 
+      data?.payment_intent_id || 
+      data?.transaction_id || 
+      `dodo_pay_${Date.now()}`;
     
-    // Check if this payment is for Lifetime Deal (by productId, name, or metadata)
-    const isLifetime = 
-      data?.metadata?.plan === "lifetime" ||
-      data?.metadata?.tier === "lifetime" ||
-      (data?.product_id && (data.product_id.includes("lifetime") || data.product_id.includes("j2z0q1cr8bh"))) ||
-      (data?.description && data.description.toLowerCase().includes("lifetime")) ||
-      (data?.title && data.title.toLowerCase().includes("lifetime")) ||
-      (data?.total_amount && (Math.abs(data.total_amount - 2092) < 5 || Math.abs(data.total_amount - 20.92) < 0.1));
+    const customerEmail = (
+      data?.customer?.email || 
+      data?.customer_email || 
+      data?.email || 
+      data?.metadata?.email || 
+      data?.prefilled_email || 
+      data?.billing_email || 
+      ""
+    ).trim().toLowerCase();
+
+    let userId = 
+      data?.metadata?.user_id || 
+      data?.metadata?.userId || 
+      data?.user_id || 
+      data?.userId || 
+      data?.client_reference_id || 
+      data?.metadata?.client_reference_id;
 
     const supabase = getSupabaseAdmin();
-    
-    if (type.includes("payment.success") || type.includes("subscription.active") || type.includes("checkout.completed") || type.includes("payment.succeeded") || type.includes("order.completed")) {
-      const expiresAt = isLifetime ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-      const tier = isLifetime ? "lifetime" : "pro";
 
-      if (supabase) {
-        if (userId) {
-          await supabase.from("subscriptions").upsert({
-            user_id: userId,
-            dodo_subscription_id: subscriptionId,
-            status: "active",
-            current_period_end: expiresAt,
-            created_at: new Date().toISOString()
-          }, { onConflict: "dodo_subscription_id" });
-
-          await supabase.from("profiles").update({
-            subscription_tier: tier,
-            subscription_status: "active",
-            subscription_expires_at: expiresAt,
-            dodo_customer_id: customerId,
-            dodo_subscription_id: subscriptionId,
-          }).eq("id", userId);
-        } else if (customerId) {
-          await supabase.from("profiles").update({
-            subscription_tier: tier,
-            subscription_status: "active",
-            subscription_expires_at: expiresAt,
-          }).eq("dodo_customer_id", customerId);
+    // If userId not provided directly in metadata, resolve via user's email in public.users
+    if (!userId && customerEmail && supabase) {
+      try {
+        const { data: userRec } = await supabase
+          .from("users")
+          .select("id")
+          .eq("email", customerEmail)
+          .maybeSingle();
+        if (userRec?.id) {
+          userId = userRec.id;
         }
+      } catch (e) {
+        console.warn("[Dodo Webhook] Could not resolve user by email:", e);
       }
-      console.log(`[Dodo Webhook] Activated ${tier} subscription for user:`, userId || customerId);
-    } else if (type.includes("payment.failed")) {
-      console.log("[Dodo Webhook] Payment failed for customer:", customerId);
-    } else if (type.includes("subscription.cancelled") || type.includes("subscription.canceled")) {
-      if (supabase) {
-        if (subscriptionId) {
-          await supabase.from("subscriptions").update({
-            status: "cancelled"
-          }).eq("dodo_subscription_id", subscriptionId);
-        }
-        if (userId) {
-          await supabase.from("profiles").update({
-            subscription_status: "cancelled"
-          }).eq("id", userId);
-        }
-      }
-      console.log("[Dodo Webhook] Subscription marked as cancelled.");
     }
-    
-    return res.status(200).json({ received: true });
+
+    // Check if this payment is for Lifetime Deal (pdt_0Nk8M2dIaqQpnEgOrwBKx or metadata)
+    const productId = data?.product_id || data?.productId || data?.product_cart?.[0]?.product_id || data?.cart?.[0]?.product_id || "";
+    const isLifetime = 
+      productId === "pdt_0Nk8M2dIaqQpnEgOrwBKx" ||
+      productId.includes("lifetime") ||
+      productId.includes("j2z0q1cr8bh") ||
+      data?.metadata?.plan === "lifetime" ||
+      data?.metadata?.tier === "lifetime" ||
+      (data?.description && data.description.toLowerCase().includes("lifetime")) ||
+      (data?.title && data.title.toLowerCase().includes("lifetime")) ||
+      (data?.total_amount && (Math.abs(data.total_amount - 2000) < 5 || Math.abs(data.total_amount - 200000) < 100 || Math.abs(data.total_amount - 20.92) < 0.1 || Math.abs(data.total_amount - 2092) < 5));
+
+    const planType = isLifetime ? "lifetime" : (data?.metadata?.plan || (productId.includes("month") ? "monthly" : "yearly"));
+
+    // Handle Payment Success / Checkout Completed
+    if (
+      type.includes("payment.success") || 
+      type.includes("payment.succeeded") || 
+      type.includes("checkout.completed") || 
+      type.includes("order.completed") || 
+      type.includes("subscription.active")
+    ) {
+      if (supabase && userId) {
+        // Insert/Upsert into subscriptions table: user_id, dodo_payment_id, plan_type, status, created_at
+        const { error: insertErr } = await supabase.from("subscriptions").upsert({
+          user_id: userId,
+          dodo_payment_id: dodoPaymentId,
+          plan_type: planType,
+          status: "active",
+          created_at: new Date().toISOString()
+        }, { onConflict: "dodo_payment_id" });
+
+        if (insertErr) {
+          console.error("[Dodo Webhook] Error inserting subscription row:", insertErr.message);
+        } else {
+          console.log(`[Dodo Webhook] Successfully recorded active subscription for user ${userId} (${planType})`);
+        }
+
+        // Also update profiles if table exists
+        try {
+          await supabase.from("profiles").update({
+            subscription_tier: isLifetime ? "lifetime" : "pro",
+            subscription_status: "active",
+            dodo_subscription_id: dodoPaymentId,
+          }).eq("id", userId);
+        } catch (pe) {}
+      }
+
+      return res.status(200).json({ 
+        success: true, 
+        received: true, 
+        user_id: userId || null, 
+        plan_type: planType, 
+        status: "active" 
+      });
+    } else if (type.includes("payment.failed")) {
+      if (supabase && (userId || dodoPaymentId)) {
+        await supabase.from("subscriptions").upsert({
+          user_id: userId || null,
+          dodo_payment_id: dodoPaymentId,
+          plan_type: planType,
+          status: "failed",
+          created_at: new Date().toISOString()
+        }, { onConflict: "dodo_payment_id" });
+      }
+      console.log(`[Dodo Webhook] Payment failure recorded for ${userId || customerEmail}`);
+      return res.status(200).json({ success: true, status: "failed" });
+    } else if (
+      type.includes("refund.completed") || 
+      type.includes("payment.refunded") || 
+      type.includes("subscription.cancelled") || 
+      type.includes("subscription.canceled")
+    ) {
+      const newStatus = type.includes("refund") ? "refunded" : "failed";
+      if (supabase) {
+        if (dodoPaymentId) {
+          await supabase.from("subscriptions").update({ status: newStatus }).eq("dodo_payment_id", dodoPaymentId);
+        } else if (userId) {
+          await supabase.from("subscriptions").update({ status: newStatus }).eq("user_id", userId);
+        }
+      }
+      console.log(`[Dodo Webhook] Updated subscription status to ${newStatus}`);
+      return res.status(200).json({ success: true, status: newStatus });
+    }
+
+    return res.status(200).json({ received: true, event: type });
   } catch (err: any) {
-    console.error("Error in /api/dodo-webhook:", err);
-    res.status(500).json({ error: "Webhook handler failed" });
+    console.error("[Dodo Webhook] Webhook processing exception:", err);
+    return res.status(500).json({ error: "Webhook handler failed", details: err.message });
   }
 });
 

@@ -100,21 +100,31 @@ CREATE INDEX IF NOT EXISTS idx_chat_user_created ON public.chat_history(user_id,
 ALTER PUBLICATION supabase_realtime ADD TABLE public.moods;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.thoughts;
 
--- 7. SUBSCRIPTIONS TABLE
+-- 7. SUBSCRIPTIONS TABLE (DODO PAYMENTS & LIFETIME ACCESS)
 CREATE TABLE IF NOT EXISTS public.subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  dodo_subscription_id TEXT UNIQUE,
-  status TEXT NOT NULL DEFAULT 'inactive',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  current_period_end TIMESTAMPTZ
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  dodo_payment_id TEXT UNIQUE,
+  plan_type TEXT NOT NULL DEFAULT 'lifetime',
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- For existing tables, safely ensure columns exist
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS dodo_payment_id TEXT;
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS plan_type TEXT DEFAULT 'lifetime';
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can only access their own subscriptions"
   ON public.subscriptions
-  FOR ALL
+  FOR SELECT
   USING (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON public.subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_dodo_payment ON public.subscriptions(dodo_payment_id);
+

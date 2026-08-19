@@ -23,7 +23,11 @@ import {
   ExternalLink,
   Calendar,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  BellRing,
+  Clock,
+  Send,
+  AlertTriangle
 } from "lucide-react";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
@@ -32,6 +36,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useSubscription } from "../contexts/SubscriptionContext";
 import { DODO_CUSTOMER_PORTAL_URL } from "../lib/subscriptions";
 import { Crown } from "lucide-react";
+import { useReminderScheduler } from "../hooks/useReminderScheduler";
 
 export const SettingsView: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +55,7 @@ export const SettingsView: React.FC = () => {
   } = useSubscription();
   
   const [settings, setSettings] = useState<AppSettings>(storage.getSettings());
+  const reminder = useReminderScheduler();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
@@ -516,51 +522,135 @@ export const SettingsView: React.FC = () => {
 
         {/* 2. Reminders & Notifications */}
         <div className="wellness-card p-6 sm:p-8 space-y-6">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/10 pb-4 font-serif">
-            <Bell className="w-5 h-5 text-[#00d4ff]" />
-            <span>Daily Check-in Reminders</span>
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <div className="space-y-1">
-              <span className="text-sm font-bold text-white block">Reminder Time</span>
-              <span className="text-xs text-white/50 block">Set a gentle daily time to reflect on your mood</span>
-            </div>
-            <div>
-              <input
-                type="time"
-                value={settings.reminderTime}
-                onChange={(e) => updateSetting("reminderTime", e.target.value)}
-                className="bg-black/30 border border-white/15 px-4 py-2.5 rounded-xl font-mono text-sm text-white w-full sm:w-auto"
-              />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2 font-serif">
+              <Bell className="w-5 h-5 text-[#00d4ff]" />
+              <span>Daily Check-in Reminders</span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                reminder.status.enabled
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  : "bg-white/10 text-white/60"
+              }`}>
+                {reminder.status.enabled ? (
+                  <>
+                    <BellRing className="w-3.5 h-3.5 animate-pulse" />
+                    <span>Scheduled ({reminder.status.timeFormatted})</span>
+                  </>
+                ) : (
+                  <span>Disabled</span>
+                )}
+              </span>
             </div>
           </div>
 
+          {/* Time Picker & Next Occurrence */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="space-y-1">
+              <span className="text-sm font-bold text-white block">Preferred Daily Time</span>
+              <span className="text-xs text-white/60 block">Choose when you want your gentle mood check-in prompt</span>
+              <p className="text-xs text-[#00d4ff] flex items-center gap-1.5 pt-1 font-medium">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Next scheduled: {reminder.status.nextOccurrence}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="time"
+                value={settings.reminderTime}
+                onChange={(e) => {
+                  updateSetting("reminderTime", e.target.value);
+                  reminder.updateReminderTime(e.target.value);
+                }}
+                className="bg-black/40 border border-white/15 px-4 py-2.5 rounded-xl font-mono text-sm text-white focus:border-[#00d4ff] focus:outline-none w-full sm:w-auto"
+              />
+              <span className="text-xs font-mono text-white/50 hidden sm:inline">
+                ({reminder.status.timeFormatted})
+              </span>
+            </div>
+          </div>
+
+          {/* Toggle and Test Button */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-4 border-t border-white/5">
             <div className="space-y-1">
               <span className="text-sm font-bold text-white block">Browser Notifications</span>
-              <span className="text-xs text-white/50 block">Receive gentle browser notifications at reminder time</span>
+              <span className="text-xs text-white/50 block">
+                Triggers a discreet desktop or mobile notification at your selected time.
+              </span>
+              {reminder.status.permission === "denied" && (
+                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 mt-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Notifications are blocked in your browser. Click the lock icon 🔒 next to the website URL to allow notifications.
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="flex justify-end">
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
               <button
+                type="button"
+                disabled={reminder.testingNotification}
                 onClick={() => {
-                  if (!settings.notifications && "Notification" in window && Notification.permission !== "granted") {
-                    Notification.requestPermission().then((perm) => {
-                      if (perm === "granted") updateSetting("notifications", true);
-                    });
+                  sounds.playClick();
+                  reminder.sendTestNotification();
+                }}
+                className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Send a sample notification to verify your browser settings"
+              >
+                {reminder.testingNotification ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5 text-[#00d4ff]" />
+                )}
+                <span>Test Notification</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  sounds.playClick();
+                  if (settings.notifications) {
+                    reminder.disableNotifications();
+                    updateSetting("notifications", false);
                   } else {
-                    updateSetting("notifications", !settings.notifications);
+                    const granted = await reminder.enableNotifications();
+                    if (granted) {
+                      updateSetting("notifications", true);
+                    }
                   }
                 }}
-                className={`px-6 py-3 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                   settings.notifications
                     ? "bg-[#00d4ff] text-[#0B1121] shadow-md shadow-[#00d4ff]/20"
-                    : "bg-white/5 border border-white/10 text-white/50 hover:text-white"
+                    : "bg-white/5 border border-white/10 text-white/60 hover:text-white"
                 }`}
               >
-                {settings.notifications ? "Notifications Active" : "Notifications Disabled"}
+                {settings.notifications ? (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Reminders Active</span>
+                  </>
+                ) : (
+                  <span>Enable Reminders</span>
+                )}
               </button>
             </div>
+          </div>
+
+          {/* Test notification feedback toast */}
+          {reminder.testSentMessage && (
+            <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 stroke-[2.5]" />
+              <span>{reminder.testSentMessage}</span>
+            </div>
+          )}
+
+          {/* Privacy Note */}
+          <div className="text-[11px] text-white/40 bg-black/20 p-3 rounded-xl border border-white/5 flex items-center gap-2">
+            <span className="font-semibold text-white/60">Privacy Guarantee:</span>
+            <span>Reminders are managed entirely on this device using local storage and service workers. No scheduled timings or habits are sent to third parties.</span>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Sparkles, Crown, ArrowRight, X, Flame } from "lucide-react";
 import { useSubscription } from "../../contexts/SubscriptionContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { sounds } from "../../lib/sounds";
 import { safeStorage } from "../../lib/safeStorage";
 
@@ -9,6 +10,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const LifetimeDealBanner: React.FC = () => {
   const { isPro, isLifetime, openLifetimeModal, successToast, dismissSuccessToast } = useSubscription();
+  const { user, loading } = useAuth();
   const [isDismissed, setIsDismissed] = useState<boolean>(true); // start true to prevent flash
   const [mounted, setMounted] = useState(false);
 
@@ -28,8 +30,8 @@ export const LifetimeDealBanner: React.FC = () => {
     }
   }, []);
 
-  // Never show any banner or pill if user is already lifetime
-  if (!mounted || isLifetime) return null;
+  // Never show any banner or pill before authentication or if user is already lifetime
+  if (!mounted || !user || isLifetime) return null;
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();

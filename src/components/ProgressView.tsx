@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { 
   TrendingUp, 
   PieChart as PieIcon, 
@@ -8,7 +9,11 @@ import {
   CheckCircle2, 
   Sparkles,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Target,
+  Trophy,
+  Award,
+  ArrowRight
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
@@ -25,7 +30,7 @@ import {
 } from "recharts";
 import { storage } from "../lib/storage";
 import { sounds } from "../lib/sounds";
-import { MoodEntry } from "../types";
+import { MoodEntry, Habit, HabitCompletionStats } from "../types";
 import { useSubscription } from "../contexts/SubscriptionContext";
 
 export const ProgressView: React.FC = () => {
@@ -34,11 +39,22 @@ export const ProgressView: React.FC = () => {
   const [moods, setMoods] = useState<MoodEntry[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [streak, setStreak] = useState<number>(0);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitStats, setHabitStats] = useState<HabitCompletionStats>({
+    totalHabits: 0,
+    completedToday: 0,
+    completionRateToday: 0,
+    totalCompletionsAllTime: 0,
+    longestStreakEver: 0,
+    activeStreakCount: 0,
+  });
 
   useEffect(() => {
     setMoods(storage.getMoods());
     setChartData(storage.getWeeklyMoodChart());
     setStreak(storage.getStreak());
+    setHabits(storage.getHabits());
+    setHabitStats(storage.getHabitStats());
   }, []);
 
   // Compute stats
@@ -349,6 +365,85 @@ export const ProgressView: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
+      {/* Daily Habits & Rituals Streak Performance */}
+      <div className="wellness-card p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2 font-serif">
+              <Target className="w-5 h-5 text-[#00d4ff]" />
+              <span>Habits &amp; Daily Rituals Consistency</span>
+            </h2>
+            <p className="text-xs text-white/50 mt-0.5">Continuous streaks and lifetime wellness milestones</p>
+          </div>
+
+          <Link
+            to="/app/habits"
+            onClick={() => sounds.playClick()}
+            className="px-4 py-2 rounded-xl bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 border border-[#00d4ff]/30 text-[#00d4ff] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Open Habits View</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-1">
+            <span className="text-xs text-white/50 flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-amber-400" />
+              <span>Active Streaks</span>
+            </span>
+            <div className="text-xl font-bold text-white font-mono">
+              {habitStats.activeStreakCount} <span className="text-xs font-normal text-white/60 font-sans">rituals maintaining momentum</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-1">
+            <span className="text-xs text-white/50 flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5 text-purple-400" />
+              <span>Best Streak Record</span>
+            </span>
+            <div className="text-xl font-bold text-white font-mono">
+              {habitStats.longestStreakEver} <span className="text-xs font-normal text-white/60 font-sans">days consecutive</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-black/30 border border-white/10 space-y-1">
+            <span className="text-xs text-white/50 flex items-center gap-1.5">
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Lifetime Completions</span>
+            </span>
+            <div className="text-xl font-bold text-white font-mono">
+              {habitStats.totalCompletionsAllTime} <span className="text-xs font-normal text-white/60 font-sans">tasks logged</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Habits List */}
+        <div className="space-y-2 pt-2">
+          {habits.slice(0, 4).map((h) => (
+            <div
+              key={h.id}
+              className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between gap-3 text-xs"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-base">{h.emoji}</span>
+                <span className="font-bold text-white">{h.title}</span>
+              </div>
+              <div className="flex items-center gap-3 font-mono">
+                {h.currentStreak > 0 ? (
+                  <span className="text-amber-300 font-bold flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{h.currentStreak}d streak</span>
+                  </span>
+                ) : (
+                  <span className="text-white/40">0d streak</span>
+                )}
+                <span className="text-white/40">• Best: {h.bestStreak}d</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

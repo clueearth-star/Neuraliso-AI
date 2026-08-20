@@ -394,16 +394,12 @@ export const LandingPage: React.FC = () => {
               <Link to="/privacy" className="text-slate-300 hover:text-white transition-colors underline decoration-white/20 min-h-[44px] flex items-center">
                 Security &amp; Privacy Policy
               </Link>
+              <Link to="/terms" className="text-slate-300 hover:text-white transition-colors underline decoration-white/20 min-h-[44px] flex items-center">
+                Terms of Service
+              </Link>
               <Link to="/pricing" className="text-slate-300 hover:text-white transition-colors min-h-[44px] flex items-center">
                 Pricing Tiers
               </Link>
-              <button 
-                type="button"
-                onClick={() => setActiveModal("terms")} 
-                className="text-slate-300 hover:text-white transition-colors cursor-pointer min-h-[44px] flex items-center"
-              >
-                Terms of Service
-              </button>
               <button 
                 type="button"
                 onClick={() => setActiveModal("about")} 

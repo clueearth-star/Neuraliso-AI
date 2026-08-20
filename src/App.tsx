@@ -23,6 +23,9 @@ import { ForgotPassword } from "./components/auth/ForgotPassword";
 import { ResetPassword } from "./components/auth/ResetPassword";
 import { PricingView } from "./components/subscription/PricingView";
 import { PrivacyPage } from "./components/PrivacyPage";
+import { TermsPage } from "./components/TermsPage";
+import { NotFoundPage } from "./components/NotFoundPage";
+import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { UpgradeModal } from "./components/subscription/UpgradeModal";
 import { LifetimeDealBanner } from "./components/subscription/LifetimeDealBanner";
 import { LifetimeCheckoutModal } from "./components/subscription/LifetimeCheckoutModal";
@@ -80,6 +83,7 @@ export function App() {
         <CrisisModal />
         <UpgradeModal />
         <PWAUpdatePrompt />
+        <CookieConsentBanner />
         
         <ErrorBoundary>
           <Routes>
@@ -91,6 +95,7 @@ export function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<PricingView />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
@@ -111,7 +116,8 @@ export function App() {
               </Route>
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Custom 404 Not Found Page */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </ErrorBoundary>
       </div>
